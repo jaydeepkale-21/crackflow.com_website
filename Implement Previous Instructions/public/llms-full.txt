@@ -1,0 +1,98 @@
+# CrackFlow Full Technical & Product Specification
+
+## Executive Summary
+CrackFlow is a native desktop artificial intelligence copilot created specifically for job candidates undergoing real-time technical, behavioral, and system design interviews. Unlike generic web chatbots or browser extensions, CrackFlow runs directly on the candidate's operating system (Windows / macOS), capturing low-latency system audio, processing natural language queries with tailored LLM models, and displaying concise answer blueprints inside a private, hardware-accelerated desktop overlay.
+
+---
+
+## Complete Feature Matrix
+
+### 1. Real-Time Audio Capture & Transcription
+- Intercepts system audio output (interviewer's voice) and candidate microphone input simultaneously.
+- Employs streaming speech-to-text models optimized for technical jargon, programming syntax, and accent resiliency.
+- Latency target: Sub-second audio chunk processing.
+
+### 2. CrackFlow Code Engine
+- Tailored for live technical rounds on LeetCode, HackerRank, CodeSignal, and CoderPad.
+- Analyzes problem statements, constraints, and edge cases.
+- Produces clean code snippets, algorithmic explanations, and explicit Big-O time and space complexity evaluations.
+
+### 3. CrackFlow Personal Context Grounding
+- Allows candidates to upload PDF/Text versions of their Resume, Portfolio, and target Job Description prior to an interview.
+- Embeds context using retrieval-augmented generation (RAG).
+- Ensures behavioral answers (e.g. STAR method responses) incorporate the candidate's real job history, metrics, and accomplishments rather than generic AI responses.
+
+### 4. Discreet Overlay Architecture & Privacy Guarantee
+- Native window rendered with OS-level flags (`WS_EX_TRANSPARENT`, `WDA_EXCLUDEFROMCAPTURE` on Windows).
+- Completely invisible to screen-sharing applications such as Zoom, Google Meet, Microsoft Teams, and Webex.
+- Keyboard-only navigation (`Ctrl+Enter` to request assist, `Ctrl+B` to show/hide, arrow keys to scroll).
+
+---
+
+## Detailed Pricing Architecture
+
+| Plan | Price | Billing Frequency | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Starter** | ₹499 | Monthly | 20 AI assists / session, Live copilot, Basic shortcuts |
+| **Pro** | ₹999 | Monthly | Unlimited assists, Resume & JD Context loading, Code mode, Mock interviews, Priority support |
+| **Lifetime** | ₹4,999 | One-Time | All Pro features, Lifetime updates, Early access to new features |
+
+*Note: Prices are in Indian Rupees (INR). Free trial available without credit card requirement.*
+
+---
+
+## Full FAQ Knowledgebase
+
+1. **What is CrackFlow?**
+   CrackFlow is a native desktop AI copilot that listens to your interview conversation in real time and provides concise, context-aware answers — without your interviewer ever knowing it's there.
+
+2. **How does CrackFlow work?**
+   CrackFlow captures audio from your system, transcribes the conversation, understands the question using AI, and delivers a structured response in your private overlay — all in seconds.
+
+3. **Does CrackFlow support coding interviews?**
+   Yes. CrackFlow Code mode handles DSA problems, debugging, time/space complexity analysis, and system design questions on platforms like LeetCode, HackerRank, and CodeSignal.
+
+4. **Can CrackFlow understand my resume and job description?**
+   Yes. CrackFlow Context lets you load your resume, project descriptions, and the job description so responses are grounded in your personal experience.
+
+5. **Does CrackFlow work with Zoom and Google Meet?**
+   CrackFlow works alongside any video meeting platform that runs on your desktop, including Zoom, Google Meet, Microsoft Teams, and Webex.
+
+6. **Does CrackFlow support HackerRank and LeetCode?**
+   Yes. CrackFlow can assist during coding assessments on HackerRank, LeetCode, CodeSignal, and CoderPad.
+
+7. **How fast does CrackFlow respond?**
+   CrackFlow is designed for low-latency assistance during live interviews. Response times depend on your network and question complexity.
+
+8. **How does CrackFlow handle interview context?**
+   You can preload context documents before your interview. CrackFlow uses this context alongside real-time transcription to generate relevant answers.
+
+9. **Is CrackFlow a browser extension?**
+   No. CrackFlow is a native desktop application, which allows it to capture system audio and maintain a private overlay separate from your browser or meeting app.
+
+10. **Does CrackFlow support different response styles?**
+    Yes. You can switch between concise bullet-point responses, detailed explanations, and code-first responses depending on what the question requires.
+
+11. **Can I use CrackFlow with a second device?**
+    Yes. You can run CrackFlow on a secondary device while your primary device runs the interview — a common setup for added discretion.
+
+12. **Does CrackFlow offer mock interviews?**
+    Yes. CrackFlow Mock lets you practice with structured AI-driven mock sessions and receive feedback on your answers.
+
+13. **Does CrackFlow work on Windows and macOS?**
+    CrackFlow currently supports Windows. macOS support is in active development.
+
+14. **How is CrackFlow different from other AI interview assistants?**
+    CrackFlow is built as a native desktop app with keyboard-first controls, context loading, and a private overlay — designed for the actual interview experience, not just practice.
+
+15. **Do CrackFlow credits expire?**
+    Credit expiry details are available on the Pricing page. Please check before purchasing.
+
+16. **Does CrackFlow require a credit card?**
+    A free trial is available. Credit card requirements depend on the plan you select.
+
+17. **Can I cancel my subscription?**
+    Yes. You can cancel your subscription at any time from your account dashboard. See our Terms for details.
+
+18. **Where can I get support?**
+    You can reach the CrackFlow support team via the Contact page or by emailing support@crackflow.in.

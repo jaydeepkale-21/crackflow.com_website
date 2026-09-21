@@ -1,0 +1,35 @@
+# CrackFlow — Native Desktop AI Copilot for Real-Time Interviews
+
+> CrackFlow is a native desktop AI copilot that listens to your live interview conversations, transcribes audio in real time, understands the question intent, and displays concise, structured answers in a private, un-shareable overlay.
+
+## Key Features
+
+- **CrackFlow Live**: Real-time AI interview assistance. Captures system audio, transcribes speech, and outputs structured bullet-point hints in seconds.
+- **CrackFlow Code**: Specialist coding assistance for DSA (Data Structures & Algorithms), debugging, time/space complexity analysis, and system design on platforms like LeetCode, HackerRank, CodeSignal, and CoderPad.
+- **CrackFlow Context**: Load your resume, past project descriptions, and the target Job Description (JD) so all generated answers are personalized to your actual experience.
+- **CrackFlow Control**: 100% keyboard-first interaction (`Ctrl+Enter` to trigger, `Ctrl+B` to toggle overlay visibility) ensuring zero mouse movements during live interviews.
+- **Private & Un-shareable Overlay**: Built as a native desktop application (not a browser extension). Its custom rendering layer is completely invisible to screen-sharing tools in Zoom, Google Meet, Microsoft Teams, and Webex.
+- **CrackFlow Mock**: Practice mode featuring structured AI-driven mock interviews with instant feedback.
+
+## Supported Platforms
+
+- **Video Conferencing**: Zoom, Google Meet, Microsoft Teams, Cisco Webex.
+- **Coding & Assessment Platforms**: HackerRank, LeetCode, CodeSignal, CoderPad.
+- **Operating Systems**: Windows (Current production release), macOS (In active beta/coming soon).
+
+## Pricing Plans (INR)
+
+- **Starter Plan**: ₹499/month — 20 AI assists per session, Live copilot, basic keyboard shortcuts.
+- **Pro Plan (Most Popular)**: ₹999/month — Unlimited AI assists, Context loading (Resume/JD), Code mode, Mock interviews, Priority support.
+- **Lifetime Access**: ₹4,999 one-time — All Pro features forever with lifetime updates.
+
+## Frequently Asked Questions
+
+- **Is CrackFlow a browser extension?** No, CrackFlow is a native desktop application. This allows it to capture system audio directly and maintain a discrete floating overlay separate from your web browser.
+- **Does CrackFlow work with Zoom and Google Meet?** Yes. It works with all desktop video conference software including Zoom, Google Meet, Teams, and Webex.
+- **Will the interviewer see CrackFlow during screen share?** No. CrackFlow's overlay window is excluded from OS screen capture buffers.
+- **Contact Support**: Reach out at support@crackflow.in.
+
+## Documentation & Deep Context
+
+For full technical specifications and deep context, see [llms-full.txt](https://crackflow.in/llms-full.txt).

@@ -1,0 +1,37 @@
+# Robots.txt for CrackFlow (https://crackflow.in)
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /private/
+
+# AI Crawlers & LLM Indexers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Anthropic-ai
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Sitemap Location
+Sitemap: https://crackflow.in/sitemap.xml
+
+# LLM Documentation Location
+# See https://llmstxt.org/ for details
+LLM: https://crackflow.in/llms.txt

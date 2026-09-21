@@ -1,0 +1,16 @@
+{
+  "name": "CrackFlow — AI Copilot for Real-Time Interviews",
+  "short_name": "CrackFlow",
+  "description": "Native desktop AI copilot for real-time technical and behavioral interviews.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#F5C518",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

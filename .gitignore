@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# Environment files and secrets
+.env
+.env.local
+.env.*.local
+*.env
+.dev.vars
+**/.dev.vars
+*serviceAccount*.json
+*adminsdk*.json
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+.wrangler/
+**/.wrangler/
+
+# Large ZIP archives & temp files
+*.zip
+ChatGPT Image*.png
+
+# Embedded separate repositories
+interview helper/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db

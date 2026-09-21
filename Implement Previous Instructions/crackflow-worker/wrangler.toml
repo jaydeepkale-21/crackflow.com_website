@@ -1,0 +1,8 @@
+name = "crackflow-backend"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "crackflow"
+ALLOWED_ORIGIN = "*"
