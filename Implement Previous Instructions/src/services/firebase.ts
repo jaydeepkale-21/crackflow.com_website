@@ -3,26 +3,23 @@ import { getAuth, Auth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "placeholder-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "placeholder.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "placeholder-project-id",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "placeholder.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDi69ZdYkql8lL42VFi8vIzh40PaO3Zt9k",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "crackflow.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "crackflow",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "crackflow.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "758352985146",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:758352985146:web:372b4448939c7b627f8903",
 };
 
-// Check if Firebase configuration is using placeholder values
+// Check if Firebase configuration is valid
 export const isFirebaseConfigured = Boolean(
-  import.meta.env.VITE_FIREBASE_API_KEY &&
-    import.meta.env.VITE_FIREBASE_PROJECT_ID &&
-    import.meta.env.VITE_FIREBASE_API_KEY !== "your-api-key-here"
+  firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.apiKey !== "placeholder-api-key"
 );
 
 if (!isFirebaseConfigured) {
-  console.warn(
-    "[CrackFlow Auth] Firebase credentials are not fully configured. Using placeholder configuration. " +
-      "Please set VITE_FIREBASE_* environment variables in .env.local to enable real authentication."
-  );
+  console.warn("[CrackFlow Auth] Firebase credentials are not fully configured.");
 }
 
 // Initialize Firebase App singleton
