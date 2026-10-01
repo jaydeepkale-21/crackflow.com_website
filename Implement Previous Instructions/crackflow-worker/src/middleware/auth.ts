@@ -219,6 +219,8 @@ export async function requireAuthenticatedUser(
   }
 }
 
+const entitlementCache = new Map<string, { profile: any; expiresAt: number }>();
+
 /**
  * Shared helper: Enforces active paid subscription/lifetime license.
  * Throws HttpError(403) on failure with UPGRADE_REQUIRED.
@@ -226,13 +228,38 @@ export async function requireAuthenticatedUser(
 export async function requireActiveEntitlement(
   user: AuthenticatedUser,
   env: Env,
-  customMessage?: string
+  customMessage?: string,
+  forceFresh: boolean = false
 ): Promise<EntitledUser> {
+  const now = Date.now();
   let profile = null;
-  try {
-    profile = await fetchUserFromFirestore(user.uid, user.rawToken, env);
-  } catch (err: any) {
-    console.error(`[requireActiveEntitlement] Error reading profile for ${user.uid}:`, err);
+  let cacheStatus = "MISS (Fetched from Firestore)";
+
+  const cached = forceFresh ? null : entitlementCache.get(user.uid);
+  if (cached && cached.expiresAt > now) {
+    const remainingSec = Math.round((cached.expiresAt - now) / 1000);
+    cacheStatus = `HIT (expires in ${remainingSec}s)`;
+    console.log(`⚡ [Entitlement Cache] HIT for ${user.uid} (${remainingSec}s remaining of 30m cache)`);
+    profile = cached.profile;
+  } else {
+    try {
+      profile = await fetchUserFromFirestore(user.uid, user.rawToken, env);
+      if (profile) {
+        // Cache paid entitlements for 30 minutes (1,800,000 ms)
+        const isPaid = (profile.subscriptionStatus === "active" || profile.lifetime === true) && 
+                       ["starter", "pro", "lifetime"].includes(profile.planTier);
+        const ttl = isPaid ? 30 * 60 * 1000 : 5 * 1000;
+        entitlementCache.set(user.uid, { profile, expiresAt: now + ttl });
+        cacheStatus = `MISS (Cached for ${isPaid ? "30m" : "5s"})`;
+        console.log(`🔍 [Entitlement Cache] MISS for ${user.uid}. Fetched from Firestore (Cached for ${isPaid ? "30m" : "5s"})`);
+      } else {
+        // User document does not exist in Firestore! Wipe cache immediately
+        entitlementCache.delete(user.uid);
+        console.warn(`🚫 [Entitlement] User document not found in Firestore for ${user.uid}. Evicted from cache.`);
+      }
+    } catch (err: any) {
+      console.error(`[requireActiveEntitlement] Error reading profile for ${user.uid}:`, err);
+    }
   }
 
   const planTier = profile?.planTier || "none";
@@ -242,6 +269,7 @@ export async function requireActiveEntitlement(
   const hasActiveAccess = isActive && ["starter", "pro", "lifetime"].includes(planTier);
 
   if (!hasActiveAccess) {
+    entitlementCache.delete(user.uid);
     throw new HttpError(
       403,
       "UPGRADE_REQUIRED",
@@ -258,5 +286,6 @@ export async function requireActiveEntitlement(
     profile,
     hasActiveAccess: true,
     planTier,
+    cacheStatus,
   };
 }

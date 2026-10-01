@@ -74,4 +74,5 @@ export interface EntitledUser extends AuthenticatedUser {
   profile: FirestoreUserProfile | null;
   hasActiveAccess: boolean;
   planTier: string;
+  cacheStatus?: string;
 }

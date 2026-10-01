@@ -1,0 +1,121 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 3188 >>
+stream
+BT
+/F2 18 Tf
+50 740 Td
+(CRACKFLOW - OFFICIAL SAMPLE INVOICE) Tj
+/F1 9 Tf
+0 -16 Td
+([RAZORPAY VERIFICATION & CUSTOMER BILLING SAMPLE DOCUMENT]) Tj
+/F2 10 Tf
+0 -28 Td
+(SELLER & OPERATOR INFORMATION:) Tj
+/F1 9 Tf
+0 -14 Td
+(Legal Business Name: crackflow.com) Tj
+0 -12 Td
+(Brand / Service: CrackFlow AI Interview Copilot | https://crackflow.com) Tj
+0 -12 Td
+(Registered Address: Khadki, Pune, Maharashtra, India - 413130) Tj
+0 -12 Td
+(Support Email: support@crackflow.com | Customer Helpline: +91 9699614146) Tj
+/F2 10 Tf
+0 -26 Td
+(PAYMENT GATEWAY & TRANSACTION DETAILS [RAZORPAY]:) Tj
+/F1 9 Tf
+0 -14 Td
+(Payment Gateway: Razorpay [Authorized Payment Aggregator - India]) Tj
+0 -12 Td
+(Razorpay Payment ID: pay_RzpCF_9921448201) Tj
+0 -12 Td
+(Razorpay Order ID: order_RzpCrackFlow_982134) Tj
+0 -12 Td
+(Payment Method: Razorpay Gateway [UPI / NetBanking / Debit & Credit Cards / Wallets]) Tj
+0 -12 Td
+(Payment Status: PAID / SUCCESS [Captured & Settled via Razorpay]) Tj
+/F2 10 Tf
+0 -26 Td
+(INVOICE & CUSTOMER METADATA:) Tj
+/F1 9 Tf
+0 -14 Td
+(Invoice Number: CF-INV-2026-0001 [Sample Audit]) Tj
+0 -12 Td
+(Invoice Date: October 01, 2026 | Currency: INR [Indian Rupee]) Tj
+0 -12 Td
+(Billed Customer: Jane Candidate | Customer Email: customer@example.com) Tj
+0 -12 Td
+(Fulfillment Type: Immediate Electronic SaaS Provisioning) Tj
+/F2 9 Tf
+0 -22 Td
+(-------------------------------------------------------------------------------------------------------------------------) Tj
+0 -12 Td
+(ITEM DESCRIPTION                                          QTY     BILLING CYCLE      UNIT PRICE (INR)   TOTAL (INR)) Tj
+0 -10 Td
+(-------------------------------------------------------------------------------------------------------------------------) Tj
+/F1 9 Tf
+0 -14 Td
+(CrackFlow Pro Plan (Desktop AI Copilot)                   1       Monthly License    999.00             999.00) Tj
+0 -12 Td
+(- Real-Time Speech-to-Text & Instant AI Answers) Tj
+0 -12 Td
+(- Private Undetectable HUD Overlay & Resume Context) Tj
+0 -12 Td
+(-------------------------------------------------------------------------------------------------------------------------) Tj
+/F2 9 Tf
+0 -14 Td
+(Subtotal:                                                                                                INR 999.00) Tj
+/F1 9 Tf
+0 -12 Td
+(GST / Tax:                                                                                               INR 0.00 [N/A - Exemption]) Tj
+/F2 10 Tf
+0 -14 Td
+(TOTAL AMOUNT PAID VIA RAZORPAY:                                                                          INR 999.00) Tj
+/F1 8 Tf
+0 -10 Td
+(Amount in Words: Indian Rupees Nine Hundred Ninety-Nine Only) Tj
+/F2 9 Tf
+0 -24 Td
+(TERMS, DIGITAL DELIVERY & REFUND NOTICE:) Tj
+/F1 8 Tf
+0 -12 Td
+(1. Delivery: Digital SaaS service provisioned immediately upon successful Razorpay payment capture.) Tj
+0 -11 Td
+(2. Refunds: Subject to crackflow.com 7-day unused refund policy. Non-refundable once AI sessions are used.) Tj
+0 -11 Td
+(3. Gateway Disputes: All legitimate refund claims processed back to original Razorpay source within 5-7 days.) Tj
+0 -11 Td
+(4. Official Support Desk: support@crackflow.com | https://crackflow.com/terms-and-conditions) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000117 00000 n 
+0000000249 00000 n 
+0000000318 00000 n 
+0000000392 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+0
+%%EOF

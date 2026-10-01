@@ -44,13 +44,22 @@ export async function handleAiComplete(
     throw new HttpError(400, "BAD_REQUEST", "Invalid JSON request body.");
   }
 
-  const model = body.model || "gemini-2.5-flash";
+  // Use ultra-low latency gemini-3.1-flash-lite for sub-1.2s TTFT
+  const model = "gemini-3.1-flash-lite";
   const stream = body.stream === true;
   const geminiPayload = body.payload || {
     contents: body.contents,
     generationConfig: body.generationConfig,
     systemInstruction: body.systemInstruction,
     safetySettings: body.safetySettings,
+  };
+
+  // Inject low-latency thinking budget control
+  geminiPayload.generationConfig = {
+    ...(geminiPayload.generationConfig || {}),
+    thinkingConfig: {
+      thinkingBudget: 0,
+    },
   };
 
   const endpoint = stream

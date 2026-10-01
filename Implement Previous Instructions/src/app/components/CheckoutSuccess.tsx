@@ -115,19 +115,33 @@ export const CheckoutSuccess: React.FC<CheckoutSuccessProps> = ({
             </div>
 
             <div className="space-y-3 pt-4">
+              <a
+                href="crackflow://payment-success"
+                onClick={() => {
+                  try {
+                    window.location.href = "crackflow://payment-success";
+                  } catch (e) {
+                    console.warn("Could not launch crackflow:// protocol", e);
+                  }
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer no-underline"
+              >
+                <span>↗ Open CrackFlow Desktop</span> <ArrowRight className="w-4 h-4" />
+              </a>
+
               <button
                 onClick={onGoToDashboard}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
               >
-                Go to Dashboard <ArrowRight className="w-4 h-4" />
+                Go to Web Dashboard
               </button>
 
               {onDownloadApp && (
                 <button
                   onClick={onDownloadApp}
-                  className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2 bg-transparent hover:bg-white/5 border border-white/10 text-gray-400 hover:text-gray-200 font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Download className="w-4 h-4" /> Download Desktop App
+                  <Download className="w-3.5 h-3.5" /> Download Windows Installer
                 </button>
               )}
             </div>

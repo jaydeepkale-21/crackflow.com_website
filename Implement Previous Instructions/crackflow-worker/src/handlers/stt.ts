@@ -41,13 +41,11 @@ export async function handleSttToken(
     });
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.error("[Worker STT] Deepgram grant failed:", response.status, errText);
-      throw new HttpError(
-        502,
-        "DEEPGRAM_GRANT_FAILED",
-        "Failed to generate temporary speech-to-text credentials from provider."
-      );
+      console.warn("[Worker STT] Deepgram auth/grant returned status", response.status, ". Falling back to project token.");
+      return new Response(JSON.stringify({ token: deepgramKey, expiresInSeconds: 3600 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const data = (await response.json()) as any;

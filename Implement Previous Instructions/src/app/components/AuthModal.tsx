@@ -259,6 +259,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               "Send Reset Link"
             )}
           </button>
+
+          <p className="text-[11px] text-gray-400 text-center pt-2 leading-relaxed">
+            By proceeding, you agree to CrackFlow's{" "}
+            <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+              Terms & Conditions
+            </a>{" "}
+            and acknowledge our{" "}
+            <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+              Refund Policy
+            </a>
+            .
+          </p>
         </form>
 
         {tab === "forgot" && (

@@ -1,6 +1,6 @@
 import { auth } from "./firebase";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -180,3 +180,22 @@ export async function getLatestVersion(): Promise<ApiResponse<VersionResponse>> 
     },
   };
 }
+
+export interface AuthExchangeResponse {
+  success: boolean;
+  code: string;
+  expiresIn: number;
+  uid: string;
+}
+
+/**
+ * POST /v1/auth/exchange/create
+ * Issues a 60s single-use auth code for the authenticated user to claim in the desktop app.
+ */
+export async function createAuthExchangeCode(session?: string): Promise<ApiResponse<AuthExchangeResponse>> {
+  return fetchApi<AuthExchangeResponse>("/v1/auth/exchange/create", {
+    method: "POST",
+    body: JSON.stringify({ session }),
+  });
+}
+

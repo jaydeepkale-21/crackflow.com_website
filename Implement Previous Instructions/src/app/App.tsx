@@ -1,9 +1,19 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Link } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { createAuthExchangeCode } from "../services/api";
 import { AuthModal } from "./components/AuthModal";
 import { Dashboard } from "./components/Dashboard";
 import { CheckoutSuccess } from "./components/CheckoutSuccess";
 import { CheckoutCancel } from "./components/CheckoutCancel";
+import { Footer } from "./components/Footer";
+import { AboutPage } from "./pages/AboutPage";
+import { PricingPage } from "./pages/PricingPage";
+import { ContactPage } from "./pages/ContactPage";
+import { DigitalDeliveryPage } from "./pages/DigitalDeliveryPage";
+import { TermsPage } from "./pages/TermsPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { PLANS } from "../config/plans";
 import {
   Zap,
@@ -1393,9 +1403,40 @@ function PricingTeaser({ onSelectPlan, loadingPlanId, demoNotice }: PricingTease
           );
         })}
       </div>
+
+      {/* Pre-Payment Legal Agreement & Policy Disclosure */}
+      <div className="mt-10 pt-6 border-t border-[#E5E7EB] text-center text-xs text-[#59616D] max-w-3xl mx-auto space-y-2.5">
+        <p className="leading-relaxed">
+          By completing your purchase, you agree to our{" "}
+          <Link to="/terms-and-conditions" className="font-semibold underline text-[#171A1F] hover:text-amber-600">
+            Terms & Conditions
+          </Link>{" "}
+          and acknowledge our{" "}
+          <Link to="/privacy-policy" className="font-semibold underline text-[#171A1F] hover:text-amber-600">
+            Privacy Policy
+          </Link>
+          ,{" "}
+          <Link to="/refund-policy" className="font-semibold underline text-[#171A1F] hover:text-amber-600">
+            Refund & Cancellation Policy
+          </Link>
+          , and{" "}
+          <Link to="/shipping-policy" className="font-semibold underline text-[#171A1F] hover:text-amber-600">
+            Digital Delivery Policy
+          </Link>
+          .
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#59616D]">
+          <Link to="/about" className="hover:underline">About CrackFlow</Link>
+          <span>•</span>
+          <Link to="/pricing" className="hover:underline">Full Plan Matrix</Link>
+          <span>•</span>
+          <Link to="/contact" className="hover:underline">Contact Support</Link>
+        </div>
+      </div>
     </section>
   );
 }
+
 
 // ─── Compare ────────────────────────────────────────────────────────────────
 function Compare() {
@@ -1593,154 +1634,33 @@ function FinalCTA({ onGetStartedClick }: FinalCTAProps) {
   );
 }
 
-// ─── Footer ─────────────────────────────────────────────────────────────────
-function Footer() {
-  const cols = [
-    {
-      heading: "Product",
-      links: ["Features", "Live Copilot", "Mock Interviews", "Coding Mode", "Behavioral Mode", "Pricing"],
-    },
-    {
-      heading: "Resources",
-      links: ["Blog", "Interview Questions", "Guides", "Compare", "FAQ"],
-    },
-    {
-      heading: "Company",
-      links: ["About", "Contact", "Support"],
-    },
-    {
-      heading: "Legal",
-      links: ["Privacy", "Terms", "Refund", "Cookies"],
-    },
-  ];
-
-  return (
-    <footer
-      className="py-16 px-5 md:px-10 border-t"
-      style={{ borderColor: BORDER, fontFamily: "Manrope, sans-serif", background: "#fff" }}
-    >
-      <div className="max-w-[1380px] mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-14">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: GOLD }}
-              >
-                <Zap size={14} color={DARK} strokeWidth={2.5} />
-              </div>
-              <span className="font-extrabold text-base" style={{ color: TEXT }}>CrackFlow</span>
-            </div>
-            <p className="text-xs leading-relaxed" style={{ color: TEXT_SEC }}>
-              AI interview copilot for real-time assistance.
-            </p>
-          </div>
-
-          {cols.map((col) => (
-            <div key={col.heading}>
-              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: TEXT_SEC }}>
-                {col.heading}
-              </p>
-              <ul className="space-y-2.5">
-                {col.links.map((l) => (
-                  <li key={l}>
-                    <a
-                      href="#"
-                      className="text-sm transition-colors hover:opacity-70"
-                      style={{ color: TEXT_SEC }}
-                    >
-                      {l}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div
-          className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t"
-          style={{ borderColor: BORDER }}
-        >
-          <p className="text-xs" style={{ color: TEXT_SEC }}>
-            © 2026 CrackFlow. All rights reserved.
-          </p>
-          <p className="text-xs" style={{ color: TEXT_SEC }}>
-            Made for candidates who take interviews seriously.
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
+interface LandingPageContentProps {
+  darkMode: boolean;
+  setDarkMode: (v: boolean) => void;
+  handleOpenAuth: (tab?: "login" | "signup" | "forgot") => void;
+  clearCheckoutParams: () => void;
+  setView: (v: "landing" | "dashboard") => void;
+  view: "landing" | "dashboard";
+  checkoutStatus: "success" | "cancel" | null;
+  isAuthenticated: boolean;
+  handleSelectPlan: (planId: "starter" | "pro" | "lifetime") => Promise<void>;
+  loadingPlanId: string | null;
+  demoNotice: string | null;
 }
 
-// ─── Root Application ────────────────────────────────────────────────────────
-export default function App() {
-  const [darkMode, setDarkMode] = useState(false);
-  const [view, setView] = useState<"landing" | "dashboard">("landing");
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<"login" | "signup" | "forgot">("login");
-  const [pendingPlanId, setPendingPlanId] = useState<"starter" | "pro" | "lifetime" | null>(null);
-  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
-  const [demoNotice, setDemoNotice] = useState<string | null>(null);
-
-  const { isAuthenticated, selectPlan } = useAuth();
-
-  const [checkoutStatus, setCheckoutStatus] = useState<"success" | "cancel" | null>(() => {
-    if (typeof window === "undefined") return null;
-    const params = new URLSearchParams(window.location.search);
-    const checkout = params.get("checkout");
-    if (checkout === "success") return "success";
-    if (checkout === "cancel") return "cancel";
-    return null;
-  });
-
-  const clearCheckoutParams = () => {
-    setCheckoutStatus(null);
-    if (typeof window !== "undefined" && window.history.replaceState) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("checkout");
-      url.searchParams.delete("session_id");
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""));
-    }
-  };
-
-  const handleOpenAuth = (tab: "login" | "signup" | "forgot" = "login") => {
-    setAuthModalTab(tab);
-    setAuthModalOpen(true);
-  };
-
-  const handleSelectPlan = async (planId: "starter" | "pro" | "lifetime") => {
-    if (!isAuthenticated) {
-      setPendingPlanId(planId);
-      handleOpenAuth("signup");
-    } else {
-      setLoadingPlanId(planId);
-      setDemoNotice(null);
-      try {
-        const res = await selectPlan(planId);
-        if (!res.success) {
-          setDemoNotice(res.error || "Failed to start checkout session.");
-        }
-      } catch (err: any) {
-        setDemoNotice(`Failed to start checkout: ${err?.message || "Unknown error"}`);
-      } finally {
-        setLoadingPlanId(null);
-      }
-    }
-  };
-
-  const handleAuthSuccess = () => {
-    if (pendingPlanId) {
-      const planToSelect = pendingPlanId;
-      setPendingPlanId(null);
-      handleSelectPlan(planToSelect);
-    } else {
-      setView("dashboard");
-    }
-  };
-
+function LandingPageContent({
+  darkMode,
+  setDarkMode,
+  handleOpenAuth,
+  clearCheckoutParams,
+  setView,
+  view,
+  checkoutStatus,
+  isAuthenticated,
+  handleSelectPlan,
+  loadingPlanId,
+  demoNotice,
+}: LandingPageContentProps) {
   return (
     <div
       style={{
@@ -1823,6 +1743,179 @@ export default function App() {
       )}
 
       <Footer />
+    </div>
+  );
+}
+
+
+// ─── Root Application ────────────────────────────────────────────────────────
+export default function App() {
+  const [darkMode, setDarkMode] = useState(false);
+  const [view, setView] = useState<"landing" | "dashboard">("landing");
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<"login" | "signup" | "forgot">("login");
+  const [pendingPlanId, setPendingPlanId] = useState<"starter" | "pro" | "lifetime" | null>(null);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
+  const [demoNotice, setDemoNotice] = useState<string | null>(null);
+
+  const { isAuthenticated, user, selectPlan } = useAuth();
+
+  // Desktop App Authentication Flow (?desktop_auth=1)
+  const [isDesktopAuthFlow] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("desktop_auth") === "1";
+  });
+  const [desktopSessionId] = useState(() => {
+    if (typeof window === "undefined") return undefined;
+    return new URLSearchParams(window.location.search).get("session") || undefined;
+  });
+  const [desktopExchangeCode, setDesktopExchangeCode] = useState<string | null>(null);
+  const [desktopAuthError, setDesktopAuthError] = useState<string | null>(null);
+  const [desktopCodeGenerating, setDesktopCodeGenerating] = useState(false);
+
+  useEffect(() => {
+    if (!isDesktopAuthFlow) return;
+
+    if (!isAuthenticated) {
+      setAuthModalTab("login");
+      setAuthModalOpen(true);
+      return;
+    }
+
+    let isMounted = true;
+    const generateCode = async () => {
+      setDesktopCodeGenerating(true);
+      setDesktopAuthError(null);
+      try {
+        const res = await createAuthExchangeCode(desktopSessionId);
+        if (!isMounted) return;
+        if (res.success && res.data?.code) {
+          setDesktopExchangeCode(res.data.code);
+          // Automatically trigger deep-link launch
+          try {
+            window.location.href = `crackflow://auth?code=${res.data.code}`;
+          } catch (e) {
+            console.warn("Could not auto-invoke crackflow://", e);
+          }
+        } else {
+          setDesktopAuthError(res.error || "Failed to generate authorization code.");
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        setDesktopAuthError(err?.message || "Failed to communicate with authorization server.");
+      } finally {
+        if (isMounted) setDesktopCodeGenerating(false);
+      }
+    };
+
+    generateCode();
+    return () => {
+      isMounted = false;
+    };
+  }, [isDesktopAuthFlow, isAuthenticated, desktopSessionId]);
+
+  const [checkoutStatus, setCheckoutStatus] = useState<"success" | "cancel" | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (checkout === "success") return "success";
+    if (checkout === "cancel") return "cancel";
+    return null;
+  });
+
+  const clearCheckoutParams = () => {
+    setCheckoutStatus(null);
+    if (typeof window !== "undefined" && window.history.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("checkout");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""));
+    }
+  };
+
+  const handleOpenAuth = (tab: "login" | "signup" | "forgot" = "login") => {
+    setAuthModalTab(tab);
+    setAuthModalOpen(true);
+  };
+
+  const handleSelectPlan = async (planId: "starter" | "pro" | "lifetime") => {
+    if (!isAuthenticated) {
+      setPendingPlanId(planId);
+      handleOpenAuth("signup");
+    } else {
+      setLoadingPlanId(planId);
+      setDemoNotice(null);
+      try {
+        const res = await selectPlan(planId);
+        if (!res.success) {
+          setDemoNotice(res.error || "Failed to start checkout session.");
+        }
+      } catch (err: any) {
+        setDemoNotice(`Failed to start checkout: ${err?.message || "Unknown error"}`);
+      } finally {
+        setLoadingPlanId(null);
+      }
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    if (pendingPlanId) {
+      const planToSelect = pendingPlanId;
+      setPendingPlanId(null);
+      handleSelectPlan(planToSelect);
+    } else {
+      setView("dashboard");
+    }
+  };
+
+  return (
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <LandingPageContent
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              handleOpenAuth={handleOpenAuth}
+              clearCheckoutParams={clearCheckoutParams}
+              setView={setView}
+              view={view}
+              checkoutStatus={checkoutStatus}
+              isAuthenticated={isAuthenticated}
+              handleSelectPlan={handleSelectPlan}
+              loadingPlanId={loadingPlanId}
+              demoNotice={demoNotice}
+            />
+          }
+        />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/shipping-policy" element={<DigitalDeliveryPage />} />
+        <Route path="/terms-and-conditions" element={<TermsPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
+        <Route
+          path="*"
+          element={
+            <LandingPageContent
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              handleOpenAuth={handleOpenAuth}
+              clearCheckoutParams={clearCheckoutParams}
+              setView={setView}
+              view={view}
+              checkoutStatus={checkoutStatus}
+              isAuthenticated={isAuthenticated}
+              handleSelectPlan={handleSelectPlan}
+              loadingPlanId={loadingPlanId}
+              demoNotice={demoNotice}
+            />
+          }
+        />
+      </Routes>
 
       {/* Auth Modal Overlay */}
       <AuthModal
@@ -1835,6 +1928,97 @@ export default function App() {
         pendingPlanId={pendingPlanId}
         onSuccess={handleAuthSuccess}
       />
-    </div>
+
+      {/* Desktop App Authentication Bridge Dialog */}
+      {isDesktopAuthFlow && isAuthenticated && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("desktop_auth");
+            url.searchParams.delete("session");
+            window.history.replaceState({}, document.title, url.pathname);
+            setView("dashboard");
+          }}
+        >
+          <div
+            className="max-w-md w-full bg-[#18181B] border border-amber-500/30 rounded-3xl p-8 text-center text-white shadow-2xl relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top-right close button */}
+            <button
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("desktop_auth");
+                url.searchParams.delete("session");
+                window.history.replaceState({}, document.title, url.pathname);
+                setView("dashboard");
+              }}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white border-none cursor-pointer transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400">
+              <Zap className="w-8 h-8 fill-amber-400" />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">Connected to CrackFlow</h3>
+            <p className="text-sm text-gray-300 mb-6">
+              Logged in as <span className="text-amber-400 font-semibold">{user?.email}</span>. Click below if your desktop app didn't return to the foreground automatically:
+            </p>
+
+            {desktopExchangeCode ? (
+              <div className="space-y-4">
+                <a
+                  href={`crackflow://auth?code=${desktopExchangeCode}`}
+                  onClick={() => {
+                    try {
+                      window.location.href = `crackflow://auth?code=${desktopExchangeCode}`;
+                    } catch (e) {
+                      console.warn("Could not invoke crackflow://", e);
+                    }
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer no-underline"
+                >
+                  <span>↗ Open CrackFlow Desktop</span> <ArrowRight className="w-4 h-4" />
+                </a>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-gray-400">
+                  Single-Use Code: <span className="font-mono text-amber-300 font-bold select-all tracking-wider ml-1">{desktopExchangeCode}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("desktop_auth");
+                    url.searchParams.delete("session");
+                    window.history.replaceState({}, document.title, url.pathname);
+                    setView("dashboard");
+                  }}
+                  className="text-xs text-gray-400 hover:text-white underline cursor-pointer bg-transparent border-none mt-2"
+                >
+                  Continue to Web Dashboard
+                </button>
+              </div>
+            ) : desktopAuthError ? (
+              <div className="space-y-4">
+                <p className="text-sm text-red-400">{desktopAuthError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs"
+                >
+                  Retry Connection
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-3 text-sm text-amber-400 py-6">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Authorizing desktop session...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
+

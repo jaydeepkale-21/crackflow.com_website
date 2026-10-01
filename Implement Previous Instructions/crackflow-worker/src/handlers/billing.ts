@@ -134,19 +134,48 @@ export async function handleCreateCheckout(
     throw new HttpError(400, "INVALID_PLAN", "Missing or invalid planId. Allowed: starter, pro, lifetime.");
   }
 
-  // Server-side mapping ONLY — never accept client priceId
-  const { priceId, mode } = getPriceIdForPlan(planId, env);
-
-  // Check if user already has a customerId in Firestore
-  const profile = await fetchUserFromFirestore(user.uid, user.rawToken, env);
-  const existingCustomerId = profile?.customerId || null;
-
   // Determine origin for redirect URLs
   const originHeader = request.headers.get("Origin");
   const defaultOrigin = env.ALLOWED_ORIGIN && !env.ALLOWED_ORIGIN.includes("*")
     ? env.ALLOWED_ORIGIN.split(",")[0].trim()
     : "http://localhost:5173";
   const origin = originHeader || defaultOrigin;
+
+  // Development mode: If Stripe keys are placeholder, simulate successful checkout and activate in Firestore
+  if (env.STRIPE_SECRET_KEY.includes("placeholder") || env.STRIPE_SECRET_KEY.startsWith("sk_test_placeholder")) {
+    console.log(`[Stripe Dev Mode] Simulating instant checkout for ${user.uid} -> plan: ${planId}`);
+    const validPlan = (["starter", "pro", "lifetime"].includes(planId) ? planId : "pro") as "starter" | "pro" | "lifetime";
+    await updateUserInFirestore(
+      user.uid,
+      {
+        planTier: validPlan,
+        subscriptionStatus: "active",
+        lifetime: validPlan === "lifetime",
+        paymentProvider: "stripe",
+        currentPeriodStart: new Date().toISOString(),
+        currentPeriodEnd: validPlan === "lifetime" ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      env
+    );
+
+    return new Response(
+      JSON.stringify({
+        checkoutUrl: `${origin}/?checkout=success&session_id=dev_sim_${Date.now()}`,
+        sessionId: `dev_sim_${Date.now()}`,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  // Server-side mapping ONLY — never accept client priceId
+  const { priceId, mode } = getPriceIdForPlan(planId, env);
+
+  // Check if user already has a customerId in Firestore
+  const profile = await fetchUserFromFirestore(user.uid, user.rawToken, env);
+  const existingCustomerId = profile?.customerId || null;
 
   // Construct Stripe Checkout Session params
   const params = new URLSearchParams();

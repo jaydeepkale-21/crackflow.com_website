@@ -15,6 +15,11 @@ import {
   handleBillingPortal,
   handleWebhook,
 } from "./handlers/billing";
+import {
+  handleCreateExchangeCode,
+  handleClaimExchangeCode,
+  handlePollExchangeSession,
+} from "./handlers/authExchange";
 
 function setCorsHeaders(headers: Headers, request: Request, env: Env): void {
   const origin = request.headers.get("Origin");
@@ -42,6 +47,7 @@ function setCorsHeaders(headers: Headers, request: Request, env: Env): void {
 
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
+  headers.set("Access-Control-Expose-Headers", "X-Entitlement-Cache");
   headers.set("Access-Control-Max-Age", "86400");
 }
 
@@ -91,6 +97,31 @@ export default {
         return new Response(res.body, { status: res.status, headers });
       }
 
+      // 3b. Auth Exchange: Create 60s Single-Use Code (Called by website with user token)
+      if (path === "/v1/auth/exchange/create" && method === "POST") {
+        const user = await requireAuthenticatedUser(request, env);
+        const res = await handleCreateExchangeCode(request, user, env);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 3c. Auth Exchange: Claim Code for Firebase Custom Token (Called by desktop)
+      if (path === "/v1/auth/exchange/claim" && method === "POST") {
+        const res = await handleClaimExchangeCode(request, env);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 3d. Auth Exchange: Poll Session for Desktop Bridge
+      if (path === "/v1/auth/exchange/poll" && method === "GET") {
+        const res = await handlePollExchangeSession(request, env);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
       // 4. Installer Download — Open to ALL authenticated users (Free & Paid)
       if (path === "/v1/download/installer" && method === "GET") {
         const user = await requireAuthenticatedUser(request, env);
@@ -100,23 +131,24 @@ export default {
         return new Response(res.body, { status: res.status, headers });
       }
 
-      // 5. Start Interview Authorization — PAID ONLY
+      // 5. Start Interview Authorization — PAID ONLY (Always LIVE check with Firestore)
       if (path === "/v1/interview/start" && method === "POST") {
         const user = await requireAuthenticatedUser(request, env);
-        const entitled = await requireActiveEntitlement(user, env);
+        const entitled = await requireActiveEntitlement(user, env, undefined, true);
         const res = handleInterviewStart(entitled);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
       }
 
-      // 6. Deepgram Temporary Token Generation — PAID ONLY
+      // 6. Deepgram Temporary Token Generation — PAID ONLY (Always LIVE check with Firestore)
       if (path === "/v1/stt/token" && method === "POST") {
         const user = await requireAuthenticatedUser(request, env);
         const entitled = await requireActiveEntitlement(
           user,
           env,
-          "Please upgrade your CrackFlow plan to start an interview."
+          "Please upgrade your CrackFlow plan to start an interview.",
+          true
         );
         const res = await handleSttToken(entitled, env);
         const headers = new Headers(res.headers);
@@ -134,6 +166,9 @@ export default {
         );
         const res = await handleAiComplete(request, entitled, env);
         const headers = new Headers(res.headers);
+        if (entitled.cacheStatus) {
+          headers.set("X-Entitlement-Cache", entitled.cacheStatus);
+        }
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
       }
