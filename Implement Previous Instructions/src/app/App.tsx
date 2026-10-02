@@ -46,6 +46,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 // ─── Brand tokens ──────────────────────────────────────────────────────────
@@ -1774,6 +1775,29 @@ export default function App() {
   const [desktopAuthError, setDesktopAuthError] = useState<string | null>(null);
   const [desktopCodeGenerating, setDesktopCodeGenerating] = useState(false);
 
+  const generateDesktopCode = async () => {
+    setDesktopCodeGenerating(true);
+    setDesktopAuthError(null);
+    try {
+      const res = await createAuthExchangeCode(desktopSessionId);
+      if (res.success && res.data?.code) {
+        setDesktopExchangeCode(res.data.code);
+        // Automatically trigger deep-link launch
+        try {
+          window.location.href = `crackflow://auth?code=${res.data.code}`;
+        } catch (e) {
+          console.warn("Could not auto-invoke crackflow://", e);
+        }
+      } else {
+        setDesktopAuthError(res.error || "Failed to generate authorization code.");
+      }
+    } catch (err: any) {
+      setDesktopAuthError(err?.message || "Failed to communicate with authorization server.");
+    } finally {
+      setDesktopCodeGenerating(false);
+    }
+  };
+
   useEffect(() => {
     if (!isDesktopAuthFlow) return;
 
@@ -1783,36 +1807,7 @@ export default function App() {
       return;
     }
 
-    let isMounted = true;
-    const generateCode = async () => {
-      setDesktopCodeGenerating(true);
-      setDesktopAuthError(null);
-      try {
-        const res = await createAuthExchangeCode(desktopSessionId);
-        if (!isMounted) return;
-        if (res.success && res.data?.code) {
-          setDesktopExchangeCode(res.data.code);
-          // Automatically trigger deep-link launch
-          try {
-            window.location.href = `crackflow://auth?code=${res.data.code}`;
-          } catch (e) {
-            console.warn("Could not auto-invoke crackflow://", e);
-          }
-        } else {
-          setDesktopAuthError(res.error || "Failed to generate authorization code.");
-        }
-      } catch (err: any) {
-        if (!isMounted) return;
-        setDesktopAuthError(err?.message || "Failed to communicate with authorization server.");
-      } finally {
-        if (isMounted) setDesktopCodeGenerating(false);
-      }
-    };
-
-    generateCode();
-    return () => {
-      isMounted = false;
-    };
+    generateDesktopCode();
   }, [isDesktopAuthFlow, isAuthenticated, desktopSessionId]);
 
   const [checkoutStatus, setCheckoutStatus] = useState<"success" | "cancel" | null>(() => {
@@ -2001,12 +1996,19 @@ export default function App() {
               </div>
             ) : desktopAuthError ? (
               <div className="space-y-4">
-                <p className="text-sm text-red-400">{desktopAuthError}</p>
+                <p className="text-sm text-red-400 font-medium">{desktopAuthError}</p>
                 <button
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs"
+                  type="button"
+                  onClick={generateDesktopCode}
+                  disabled={desktopCodeGenerating}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold rounded-xl text-xs cursor-pointer shadow-md transition-all inline-flex items-center gap-1.5 border-none"
                 >
-                  Retry Connection
+                  {desktopCodeGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  <span>{desktopCodeGenerating ? "Connecting..." : "Retry Connection"}</span>
                 </button>
               </div>
             ) : (

@@ -1,6 +1,6 @@
 import { auth } from "./firebase";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -69,13 +69,28 @@ async function fetchApi<T>(
 
   try {
     const headers = await getAuthHeader();
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const requestOptions = {
       ...options,
       headers: {
         ...headers,
         ...(options.headers || {}),
       },
-    });
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions);
+    } catch (primaryErr) {
+      if (API_BASE_URL.includes("localhost")) {
+        const fallbackUrl = API_BASE_URL.replace("localhost", "127.0.0.1");
+        response = await fetch(`${fallbackUrl}${endpoint}`, requestOptions);
+      } else if (API_BASE_URL.includes("127.0.0.1")) {
+        const fallbackUrl = API_BASE_URL.replace("127.0.0.1", "localhost");
+        response = await fetch(`${fallbackUrl}${endpoint}`, requestOptions);
+      } else {
+        throw primaryErr;
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
