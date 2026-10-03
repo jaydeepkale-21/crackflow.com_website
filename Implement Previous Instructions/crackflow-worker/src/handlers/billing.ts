@@ -851,6 +851,22 @@ export async function handleRazorpayWebhook(request: Request, env: Env): Promise
       );
       console.log(`[Razorpay Webhook] Entitlement updated for ${uid} via ${eventType}`);
     }
+  } else if (eventType === "payment.failed") {
+    const payment = payload?.payment?.entity;
+    const notes = payment?.notes || {};
+    const uid = notes.uid;
+    if (uid) {
+      await updateUserInFirestore(
+        uid,
+        {
+          subscriptionStatus: "past_due",
+          paymentProvider: "razorpay",
+          updatedAt: new Date().toISOString(),
+        },
+        env
+      );
+      console.log(`[Razorpay Webhook] Payment failed recorded for ${uid}`);
+    }
   }
 
   return new Response(JSON.stringify({ status: "ok", received: true }), { status: 200 });
