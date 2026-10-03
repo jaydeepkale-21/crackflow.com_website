@@ -114,24 +114,25 @@ export const CheckoutSuccess: React.FC<CheckoutSuccessProps> = ({
               </p>
             </div>
 
-            <div className="space-y-3 pt-4">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-300 text-left">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400 mb-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Entitlement Synchronized</span>
+              </div>
+              Your desktop copilot has unlocked live interview solving automatically. You can switch directly to your CrackFlow window on your screen.
+            </div>
+
+            <div className="space-y-3 pt-2">
               <a
                 href="crackflow://payment-success"
-                onClick={() => {
-                  try {
-                    window.location.href = "crackflow://payment-success";
-                  } catch (e) {
-                    console.warn("Could not launch crackflow:// protocol", e);
-                  }
-                }}
                 className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer no-underline"
               >
-                <span>↗ Open CrackFlow Desktop</span> <ArrowRight className="w-4 h-4" />
+                <span>↗ Bring CrackFlow Desktop to Front</span> <ArrowRight className="w-4 h-4" />
               </a>
 
               <button
                 onClick={onGoToDashboard}
-                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer border-none"
               >
                 Go to Web Dashboard
               </button>

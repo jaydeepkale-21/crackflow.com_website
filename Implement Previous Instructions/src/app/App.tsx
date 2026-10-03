@@ -47,6 +47,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  Copy,
 } from "lucide-react";
 
 // ─── Brand tokens ──────────────────────────────────────────────────────────
@@ -1774,6 +1775,7 @@ export default function App() {
   const [desktopExchangeCode, setDesktopExchangeCode] = useState<string | null>(null);
   const [desktopAuthError, setDesktopAuthError] = useState<string | null>(null);
   const [desktopCodeGenerating, setDesktopCodeGenerating] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const generateDesktopCode = async () => {
     setDesktopCodeGenerating(true);
@@ -1782,12 +1784,6 @@ export default function App() {
       const res = await createAuthExchangeCode(desktopSessionId);
       if (res.success && res.data?.code) {
         setDesktopExchangeCode(res.data.code);
-        // Automatically trigger deep-link launch
-        try {
-          window.location.href = `crackflow://auth?code=${res.data.code}`;
-        } catch (e) {
-          console.warn("Could not auto-invoke crackflow://", e);
-        }
       } else {
         setDesktopAuthError(res.error || "Failed to generate authorization code.");
       }
@@ -1959,29 +1955,59 @@ export default function App() {
               <Zap className="w-8 h-8 fill-amber-400" />
             </div>
             <h3 className="text-2xl font-bold mb-2">Connected to CrackFlow</h3>
-            <p className="text-sm text-gray-300 mb-6">
-              Logged in as <span className="text-amber-400 font-semibold">{user?.email}</span>. Click below if your desktop app didn't return to the foreground automatically:
+            <p className="text-sm text-gray-300 mb-4">
+              Logged in as <span className="text-amber-400 font-semibold">{user?.email}</span>.
             </p>
 
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 text-xs text-emerald-300 text-left mb-5">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400 mb-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Account Linked Successfully</span>
+              </div>
+              Your desktop session is synchronized. Switch back to your CrackFlow desktop app window on your screen and click <strong>Next</strong>.
+            </div>
+
             {desktopExchangeCode ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <a
                   href={`crackflow://auth?code=${desktopExchangeCode}`}
-                  onClick={() => {
-                    try {
-                      window.location.href = `crackflow://auth?code=${desktopExchangeCode}`;
-                    } catch (e) {
-                      console.warn("Could not invoke crackflow://", e);
-                    }
-                  }}
-                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer no-underline"
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer no-underline transition-all"
                 >
-                  <span>↗ Open CrackFlow Desktop</span> <ArrowRight className="w-4 h-4" />
+                  <span>↗ Bring CrackFlow Desktop to Front</span> <ArrowRight className="w-4 h-4" />
                 </a>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-gray-400">
-                  Single-Use Code: <span className="font-mono text-amber-300 font-bold select-all tracking-wider ml-1">{desktopExchangeCode}</span>
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between gap-2 text-xs">
+                  <div className="text-left overflow-hidden">
+                    <div className="text-[11px] text-gray-400">Single-Use Code:</div>
+                    <span className="font-mono text-amber-300 font-bold select-all tracking-wider text-xs">
+                      {desktopExchangeCode}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(desktopExchangeCode);
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
+                    }}
+                    className="px-2.5 py-1.5 bg-white/10 hover:bg-white/15 text-gray-200 rounded-lg text-[11px] font-semibold border-none cursor-pointer flex items-center gap-1 transition-all"
+                  >
+                    {codeCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Code</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => {
                     const url = new URL(window.location.href);
                     url.searchParams.delete("desktop_auth");
