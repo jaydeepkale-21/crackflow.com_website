@@ -1971,6 +1971,15 @@ export default function App() {
               <div className="space-y-3">
                 <a
                   href={`crackflow://auth?code=${desktopExchangeCode}`}
+                  onClick={() => {
+                    setTimeout(() => {
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete("desktop_auth");
+                      url.searchParams.delete("session");
+                      window.history.replaceState({}, document.title, url.pathname);
+                      setView("dashboard");
+                    }, 500);
+                  }}
                   className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer no-underline transition-all"
                 >
                   <span>↗ Bring CrackFlow Desktop to Front</span> <ArrowRight className="w-4 h-4" />
