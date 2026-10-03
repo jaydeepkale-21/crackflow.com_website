@@ -13,7 +13,7 @@ import {
   signOutUser,
   sendPasswordReset,
 } from "../services/auth";
-import { getMe, createCheckout, UserMeData } from "../services/api";
+import { getMe, createCheckout, verifyRazorpayPayment, UserMeData } from "../services/api";
 
 export interface PlanSelectResult {
   success: boolean;
@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const res = await createCheckout(planId);
-    if (!res.success || !res.data?.checkoutUrl) {
+    if (!res.success || !res.data) {
       const errMsg = res.error || "Failed to initialize checkout session. Please try again.";
       return {
         success: false,
@@ -130,12 +130,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Redirect user to Stripe hosted checkout page
-    window.location.href = res.data.checkoutUrl;
+    // 1. Razorpay Flow (Direct Modal)
+    if ("provider" in res.data && res.data.provider === "razorpay") {
+      const rzpData = res.data;
+      return new Promise<PlanSelectResult>((resolve) => {
+        const RazorpayClass = (window as any).Razorpay;
+        if (!RazorpayClass) {
+          const err = "Razorpay checkout SDK failed to load. Please refresh the page.";
+          resolve({ success: false, error: err, message: err });
+          return;
+        }
+
+        const options = {
+          key: rzpData.keyId,
+          amount: rzpData.amount,
+          currency: rzpData.currency,
+          name: "CrackFlow",
+          description: rzpData.description,
+          order_id: rzpData.orderId,
+          prefill: {
+            name: user.displayName || rzpData.user?.name || "",
+            email: user.email || rzpData.user?.email || "",
+          },
+          theme: {
+            color: "#6366f1",
+          },
+          handler: async (response: any) => {
+            try {
+              const verifyRes = await verifyRazorpayPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                planId,
+              });
+
+              if (verifyRes.success) {
+                await refreshProfile();
+                window.location.href = "/?checkout=success";
+                resolve({
+                  success: true,
+                  message: "Payment verified successfully!",
+                });
+              } else {
+                const err = verifyRes.error || "Payment verification failed.";
+                resolve({ success: false, error: err, message: err });
+              }
+            } catch (err: any) {
+              resolve({
+                success: false,
+                error: err?.message || "Error verifying payment",
+                message: err?.message || "Error verifying payment",
+              });
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              resolve({
+                success: false,
+                error: "Checkout was cancelled by user.",
+                message: "Payment cancelled.",
+              });
+            },
+          },
+        };
+
+        const rzp = new RazorpayClass(options);
+        rzp.open();
+      });
+    }
+
+    // 2. Stripe Flow Fallback (Hosted Redirect)
+    if ("checkoutUrl" in res.data && res.data.checkoutUrl) {
+      window.location.href = res.data.checkoutUrl;
+      return {
+        success: true,
+        checkoutUrl: res.data.checkoutUrl,
+        message: "Redirecting to secure Checkout...",
+      };
+    }
+
     return {
-      success: true,
-      checkoutUrl: res.data.checkoutUrl,
-      message: "Redirecting to secure Stripe Checkout...",
+      success: false,
+      error: "Unexpected checkout response format.",
+      message: "Unexpected checkout response format.",
     };
   };
 

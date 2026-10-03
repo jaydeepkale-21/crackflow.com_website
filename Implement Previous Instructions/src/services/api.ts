@@ -19,9 +19,33 @@ export interface UserMeData {
   expiresAt?: string | null;
 }
 
-export interface CheckoutResponse {
+export interface StripeCheckoutResponse {
   checkoutUrl: string;
   sessionId?: string;
+}
+
+export interface RazorpayOrderResponse {
+  provider: "razorpay";
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  planId: string;
+  name: string;
+  description: string;
+  user: {
+    name?: string;
+    email?: string;
+  };
+}
+
+export type CheckoutResponse = StripeCheckoutResponse | RazorpayOrderResponse;
+
+export interface RazorpayVerifyData {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  planId: string;
 }
 
 export interface DownloadResponse {
@@ -141,6 +165,17 @@ export async function createCheckout(planId: string): Promise<ApiResponse<Checko
   return fetchApi<CheckoutResponse>("/v1/billing/checkout", {
     method: "POST",
     body: JSON.stringify({ planId }),
+  });
+}
+
+/**
+ * POST /v1/billing/razorpay/verify
+ * Verifies Razorpay payment signature with backend and activates user entitlement.
+ */
+export async function verifyRazorpayPayment(data: RazorpayVerifyData): Promise<ApiResponse<any>> {
+  return fetchApi<any>("/v1/billing/razorpay/verify", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
 

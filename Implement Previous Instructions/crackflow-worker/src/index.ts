@@ -14,6 +14,8 @@ import {
   handleCreateCheckout,
   handleBillingPortal,
   handleWebhook,
+  handleVerifyRazorpayPayment,
+  handleRazorpayWebhook,
 } from "./handlers/billing";
 import {
   handleCreateExchangeCode,
@@ -173,10 +175,19 @@ export default {
         return new Response(res.body, { status: res.status, headers });
       }
 
-      // 8. Stripe Billing: Create Checkout Session — Authenticated
+      // 8. Billing: Create Checkout Session (Razorpay / Stripe) — Authenticated
       if (path === "/v1/billing/checkout" && method === "POST") {
         const user = await requireAuthenticatedUser(request, env);
         const res = await handleCreateCheckout(request, user, env);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 8b. Razorpay: Verify Payment Signature & Activate Entitlement — Authenticated
+      if (path === "/v1/billing/razorpay/verify" && method === "POST") {
+        const user = await requireAuthenticatedUser(request, env);
+        const res = await handleVerifyRazorpayPayment(request, user, env);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
@@ -194,6 +205,14 @@ export default {
       // 10. Stripe Billing: Webhook Listener — Signature Verified
       if (path === "/v1/billing/webhook" && method === "POST") {
         const res = await handleWebhook(request, env);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 10b. Razorpay: Webhook Listener — Signature Verified
+      if (path === "/v1/billing/razorpay/webhook" && method === "POST") {
+        const res = await handleRazorpayWebhook(request, env);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });

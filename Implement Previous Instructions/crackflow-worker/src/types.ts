@@ -9,6 +9,9 @@ export interface Env {
   STRIPE_STARTER_PRICE_ID?: string;
   STRIPE_PRO_PRICE_ID?: string;
   STRIPE_LIFETIME_PRICE_ID?: string;
+  RAZORPAY_KEY_ID?: string;
+  RAZORPAY_KEY_SECRET?: string;
+  RAZORPAY_WEBHOOK_SECRET?: string;
 }
 
 export interface DecodedFirebaseToken {

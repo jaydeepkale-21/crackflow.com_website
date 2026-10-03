@@ -110,6 +110,12 @@ async function verifyStripeSignature(rawBody: string, signatureHeader: string | 
   return signatures.some((sig) => safeEqual(sig, expectedSig));
 }
 
+export const RAZORPAY_PLAN_AMOUNTS: Record<PlanTier, { amount: number; currency: string; name: string }> = {
+  starter: { amount: 49900, currency: "INR", name: "CrackFlow Starter Plan (Monthly)" },
+  pro: { amount: 99900, currency: "INR", name: "CrackFlow Pro Plan (Monthly)" },
+  lifetime: { amount: 499900, currency: "INR", name: "CrackFlow Lifetime Access" },
+};
+
 /**
  * POST /v1/billing/checkout
  */
@@ -118,10 +124,6 @@ export async function handleCreateCheckout(
   user: AuthenticatedUser,
   env: Env
 ): Promise<Response> {
-  if (!env.STRIPE_SECRET_KEY) {
-    throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "STRIPE_SECRET_KEY is not configured.");
-  }
-
   let body: any = {};
   try {
     body = await request.json();
@@ -132,6 +134,69 @@ export async function handleCreateCheckout(
   const planId = body?.planId;
   if (!planId || typeof planId !== "string") {
     throw new HttpError(400, "INVALID_PLAN", "Missing or invalid planId. Allowed: starter, pro, lifetime.");
+  }
+
+  // 1. Razorpay Order Flow (Active when credentials provided)
+  const isRazorpayRequested =
+    body?.provider === "razorpay" ||
+    (!body?.provider && Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET));
+
+  if (isRazorpayRequested && env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
+    const validPlan = (["starter", "pro", "lifetime"].includes(planId) ? planId : "pro") as PlanTier;
+    const planConfig = RAZORPAY_PLAN_AMOUNTS[validPlan] || RAZORPAY_PLAN_AMOUNTS.pro;
+    const authString = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
+    const receipt = `rcpt_${user.uid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10)}_${Date.now().toString().slice(-6)}`;
+
+    const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${authString}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: planConfig.amount,
+        currency: planConfig.currency,
+        receipt,
+        notes: {
+          uid: user.uid,
+          email: user.email || "",
+          planId: validPlan,
+        },
+      }),
+    });
+
+    if (!rzpRes.ok) {
+      const errText = await rzpRes.text();
+      console.error(`[Razorpay Checkout] Failed to create order: ${rzpRes.status} - ${errText}`);
+      throw new HttpError(502, "RAZORPAY_ORDER_FAILED", `Failed to initialize Razorpay order: ${errText}`);
+    }
+
+    const order = (await rzpRes.json()) as any;
+    return new Response(
+      JSON.stringify({
+        provider: "razorpay",
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: env.RAZORPAY_KEY_ID,
+        planId: validPlan,
+        name: "CrackFlow",
+        description: planConfig.name,
+        user: {
+          name: user.decoded?.name || "",
+          email: user.email || "",
+        },
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  // 2. Stripe Flow Fallback
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "STRIPE_SECRET_KEY is not configured.");
   }
 
   // Determine origin for redirect URLs
@@ -626,3 +691,168 @@ async function processStripeEvent(event: any, env: Env): Promise<string | null> 
       return null;
   }
 }
+
+/**
+ * POST /v1/billing/razorpay/verify
+ * Verifies Razorpay payment signature and activates user entitlement in Firestore.
+ */
+export async function handleVerifyRazorpayPayment(
+  request: Request,
+  user: AuthenticatedUser,
+  env: Env
+): Promise<Response> {
+  if (!env.RAZORPAY_KEY_SECRET) {
+    throw new HttpError(500, "RAZORPAY_NOT_CONFIGURED", "Razorpay is not configured on server.");
+  }
+
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {
+    throw new HttpError(400, "BAD_REQUEST", "Invalid JSON body.");
+  }
+
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId } = body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    throw new HttpError(
+      400,
+      "MISSING_PAYMENT_FIELDS",
+      "Missing razorpay_order_id, razorpay_payment_id, or razorpay_signature."
+    );
+  }
+
+  // 1. Cryptographic HMAC-SHA256 signature verification
+  const payloadToSign = `${razorpay_order_id}|${razorpay_payment_id}`;
+  const expectedSig = await computeHmacSha256Hex(env.RAZORPAY_KEY_SECRET, payloadToSign);
+
+  if (!safeEqual(expectedSig, razorpay_signature)) {
+    console.warn(`[Razorpay Verify] Invalid signature for user ${user.uid}, order ${razorpay_order_id}`);
+    throw new HttpError(400, "INVALID_SIGNATURE", "Razorpay payment signature verification failed.");
+  }
+
+  // 2. Resolve verified plan tier (inspecting Razorpay Order notes if reachable)
+  let verifiedPlan: PlanTier = (planId as PlanTier) || "pro";
+  if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
+    try {
+      const authString = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
+      const orderCheckRes = await fetch(`https://api.razorpay.com/v1/orders/${razorpay_order_id}`, {
+        headers: { Authorization: `Basic ${authString}` },
+      });
+      if (orderCheckRes.ok) {
+        const orderData: any = await orderCheckRes.json();
+        if (orderData.notes?.planId && ["starter", "pro", "lifetime"].includes(orderData.notes.planId)) {
+          verifiedPlan = orderData.notes.planId as PlanTier;
+        }
+      }
+    } catch (orderErr) {
+      console.warn("[Razorpay Verify] Could not fetch order notes, falling back to body.planId:", orderErr);
+    }
+  }
+
+  if (!["starter", "pro", "lifetime"].includes(verifiedPlan)) {
+    verifiedPlan = "pro";
+  }
+
+  // 3. Grant entitlement in Firestore
+  const now = new Date();
+  const isLifetime = verifiedPlan === "lifetime";
+  const periodEnd = isLifetime
+    ? null
+    : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const updates: Partial<FirestoreUserProfile> = {
+    planTier: verifiedPlan,
+    subscriptionStatus: "active",
+    paymentProvider: "razorpay",
+    subscriptionId: razorpay_payment_id,
+    customerId: user.uid,
+    lifetime: isLifetime,
+    currentPeriodStart: now.toISOString(),
+    currentPeriodEnd: periodEnd,
+    updatedAt: now.toISOString(),
+  };
+
+  await updateUserInFirestore(user.uid, updates, env);
+  console.log(`[Razorpay Verify] Entitlement successfully activated for ${user.uid} -> plan: ${verifiedPlan}`);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: "Payment verified and entitlement activated successfully.",
+      planTier: verifiedPlan,
+      subscriptionStatus: "active",
+      hasActiveAccess: true,
+      expiresAt: periodEnd,
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+}
+
+/**
+ * POST /v1/billing/razorpay/webhook
+ * Razorpay webhook handler for asynchronous payment events.
+ */
+export async function handleRazorpayWebhook(request: Request, env: Env): Promise<Response> {
+  const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET || env.RAZORPAY_KEY_SECRET;
+  if (!webhookSecret) {
+    return new Response(JSON.stringify({ error: "RAZORPAY_SECRET_NOT_CONFIGURED" }), { status: 500 });
+  }
+
+  const signature = request.headers.get("X-Razorpay-Signature");
+  const rawBody = await request.text();
+
+  if (!signature) {
+    return new Response(JSON.stringify({ error: "MISSING_SIGNATURE" }), { status: 400 });
+  }
+
+  const expectedSig = await computeHmacSha256Hex(webhookSecret, rawBody);
+  if (!safeEqual(expectedSig, signature)) {
+    return new Response(JSON.stringify({ error: "INVALID_SIGNATURE" }), { status: 400 });
+  }
+
+  let event: any;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return new Response(JSON.stringify({ error: "INVALID_JSON" }), { status: 400 });
+  }
+
+  const eventType = event.event;
+  const payload = event.payload;
+
+  if (eventType === "payment.captured" || eventType === "order.paid") {
+    const payment = payload?.payment?.entity;
+    const order = payload?.order?.entity;
+    const notes = payment?.notes || order?.notes || {};
+    const uid = notes.uid;
+    const planId = (notes.planId as PlanTier) || "pro";
+
+    if (uid) {
+      const now = new Date();
+      const isLifetime = planId === "lifetime";
+      await updateUserInFirestore(
+        uid,
+        {
+          planTier: planId,
+          subscriptionStatus: "active",
+          paymentProvider: "razorpay",
+          subscriptionId: payment?.id || "rzp_webhook",
+          customerId: uid,
+          lifetime: isLifetime,
+          currentPeriodStart: now.toISOString(),
+          currentPeriodEnd: isLifetime ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: now.toISOString(),
+        },
+        env
+      );
+      console.log(`[Razorpay Webhook] Entitlement updated for ${uid} via ${eventType}`);
+    }
+  }
+
+  return new Response(JSON.stringify({ status: "ok", received: true }), { status: 200 });
+}
+

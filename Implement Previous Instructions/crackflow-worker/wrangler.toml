@@ -6,3 +6,4 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 FIREBASE_PROJECT_ID = "crackflow"
 ALLOWED_ORIGIN = "*"
+RAZORPAY_KEY_ID = "rzp_test_TjXFwfwJaFkYJd"
