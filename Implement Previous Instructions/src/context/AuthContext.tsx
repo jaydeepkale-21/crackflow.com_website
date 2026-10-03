@@ -12,6 +12,11 @@ import {
   signInWithGoogle,
   signOutUser,
   sendPasswordReset,
+  linkPendingCredential,
+  linkGoogleAccount,
+  addPasswordToAccount,
+  sendVerificationEmail,
+  reloadAndCheckVerification,
 } from "../services/auth";
 import { getMe, createCheckout, verifyRazorpayPayment, UserMeData } from "../services/api";
 
@@ -29,9 +34,18 @@ interface AuthContextType {
   hasActiveAccess: boolean;
   loading: boolean;
   isAuthenticated: boolean;
+  isEmailVerified: boolean;
+  providers: string[];
+  hasPasswordProvider: boolean;
+  hasGoogleProvider: boolean;
   login: typeof signInWithEmail;
   signup: typeof signUpWithEmail;
   loginWithGoogle: typeof signInWithGoogle;
+  linkPendingCredential: typeof linkPendingCredential;
+  linkGoogleAccount: typeof linkGoogleAccount;
+  addPasswordToAccount: typeof addPasswordToAccount;
+  sendVerificationEmail: typeof sendVerificationEmail;
+  reloadAndCheckVerification: typeof reloadAndCheckVerification;
   logout: typeof signOutUser;
   resetPassword: typeof sendPasswordReset;
   refreshProfile: () => Promise<void>;
@@ -221,6 +235,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     : (userProfile?.subscriptionStatus === "active" || userProfile?.lifetime === true) &&
       ["starter", "pro", "lifetime"].includes(userProfile?.planTier || "");
 
+  const providers = user?.providerData ? user.providerData.map((p) => p.providerId) : [];
+  const hasPasswordProvider = providers.includes("password");
+  const hasGoogleProvider = providers.includes("google.com");
+  const isEmailVerified = Boolean(user?.emailVerified);
+
   const value: AuthContextType = {
     user,
     userProfile,
@@ -228,9 +247,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasActiveAccess,
     loading,
     isAuthenticated: !!user,
+    isEmailVerified,
+    providers,
+    hasPasswordProvider,
+    hasGoogleProvider,
     login: signInWithEmail,
     signup: signUpWithEmail,
     loginWithGoogle: signInWithGoogle,
+    linkPendingCredential,
+    linkGoogleAccount,
+    addPasswordToAccount,
+    sendVerificationEmail,
+    reloadAndCheckVerification,
     logout: signOutUser,
     resetPassword: sendPasswordReset,
     refreshProfile,
