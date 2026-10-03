@@ -1812,7 +1812,8 @@ export default function App() {
     if (!isDesktopAuthFlow) return;
 
     if (!isAuthenticated) {
-      setAuthModalTab("login");
+      const modeParam = new URLSearchParams(window.location.search).get("mode");
+      setAuthModalTab(modeParam === "signup" ? "signup" : "login");
       setAuthModalOpen(true);
       return;
     }
