@@ -1763,11 +1763,25 @@ export default function App() {
   const { isAuthenticated, user, selectPlan } = useAuth();
 
   // Desktop App Authentication Flow (?desktop_auth=1)
-  const [isDesktopAuthFlow] = useState(() => {
+  const [isDesktopAuthFlow, setIsDesktopAuthFlow] = useState(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(window.location.search);
     return params.get("desktop_auth") === "1";
   });
+
+  const closeDesktopAuthModal = () => {
+    setIsDesktopAuthFlow(false);
+    if (typeof window !== "undefined" && window.history.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("desktop_auth");
+      url.searchParams.delete("session");
+      const remainingSearch = url.searchParams.toString();
+      const newUrl = url.pathname + (remainingSearch ? `?${remainingSearch}` : "");
+      window.history.replaceState({}, document.title, newUrl);
+    }
+    setView("dashboard");
+  };
+
   const [desktopSessionId] = useState(() => {
     if (typeof window === "undefined") return undefined;
     return new URLSearchParams(window.location.search).get("session") || undefined;
@@ -1924,13 +1938,7 @@ export default function App() {
       {isDesktopAuthFlow && isAuthenticated && (
         <div
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => {
-            const url = new URL(window.location.href);
-            url.searchParams.delete("desktop_auth");
-            url.searchParams.delete("session");
-            window.history.replaceState({}, document.title, url.pathname);
-            setView("dashboard");
-          }}
+          onClick={closeDesktopAuthModal}
         >
           <div
             className="max-w-md w-full bg-[#18181B] border border-amber-500/30 rounded-3xl p-8 text-center text-white shadow-2xl relative overflow-hidden"
@@ -1938,13 +1946,7 @@ export default function App() {
           >
             {/* Top-right close button */}
             <button
-              onClick={() => {
-                const url = new URL(window.location.href);
-                url.searchParams.delete("desktop_auth");
-                url.searchParams.delete("session");
-                window.history.replaceState({}, document.title, url.pathname);
-                setView("dashboard");
-              }}
+              onClick={closeDesktopAuthModal}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white border-none cursor-pointer transition-colors"
               title="Close"
             >
@@ -1972,13 +1974,7 @@ export default function App() {
                 <a
                   href={`crackflow://auth?code=${desktopExchangeCode}`}
                   onClick={() => {
-                    setTimeout(() => {
-                      const url = new URL(window.location.href);
-                      url.searchParams.delete("desktop_auth");
-                      url.searchParams.delete("session");
-                      window.history.replaceState({}, document.title, url.pathname);
-                      setView("dashboard");
-                    }, 500);
+                    setTimeout(closeDesktopAuthModal, 500);
                   }}
                   className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer no-underline transition-all"
                 >
@@ -2017,13 +2013,7 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("desktop_auth");
-                    url.searchParams.delete("session");
-                    window.history.replaceState({}, document.title, url.pathname);
-                    setView("dashboard");
-                  }}
+                  onClick={closeDesktopAuthModal}
                   className="text-xs text-gray-400 hover:text-white underline cursor-pointer bg-transparent border-none mt-2"
                 >
                   Continue to Web Dashboard
