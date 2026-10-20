@@ -1,9 +1,13 @@
-name = "crackflow-backend"
+name = "crackflow-com-website"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
 FIREBASE_PROJECT_ID = "crackflow"
-ALLOWED_ORIGIN = "*"
+ALLOWED_ORIGIN = "https://crackflow.com,https://*.pages.dev,http://localhost:5173,http://127.0.0.1:5173,tauri://localhost,https://tauri.localhost"
 RAZORPAY_KEY_ID = "rzp_test_TjXFwfwJaFkYJd"
+
+routes = [
+  { pattern = "api.crackflow.com", custom_domain = true }
+]
