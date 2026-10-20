@@ -38,7 +38,7 @@ service cloud.firestore {
         && data.uid == userId
         && isValidOptionalString(data.email, 200)
         && isValidOptionalString(data.displayName, 100)
-        && isValidOptionalString(data.photoURL, 500)
+        && isValidOptionalString(data.photoURL, 2000)
         // Initial plan and status must be strictly unpaid / default
         && data.planTier == 'none'
         && data.subscriptionStatus == 'none'
@@ -90,7 +90,7 @@ service cloud.firestore {
         // If displayName is modified, validate type & length
         && (!affected.hasAny(['displayName']) || isValidOptionalString(request.resource.data.displayName, 100))
         // If photoURL is modified, validate type & length
-        && (!affected.hasAny(['photoURL']) || isValidOptionalString(request.resource.data.photoURL, 500))
+        && (!affected.hasAny(['photoURL']) || isValidOptionalString(request.resource.data.photoURL, 2000))
         // If updatedAt is modified, validate timestamp
         && (!affected.hasAny(['updatedAt']) || request.resource.data.updatedAt is timestamp);
     }

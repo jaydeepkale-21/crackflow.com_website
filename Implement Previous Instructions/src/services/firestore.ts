@@ -47,22 +47,48 @@ export async function createUserProfile(user: User): Promise<UserProfileData> {
     updatedAt: serverTimestamp(),
   };
 
-  await setDoc(userRef, initialProfile);
-  return initialProfile;
+  try {
+    await setDoc(userRef, initialProfile);
+    return initialProfile;
+  } catch (err) {
+    // If concurrent creation won the race, fetch and return the created document
+    const snap = await getDoc(userRef).catch(() => null);
+    if (snap && snap.exists()) {
+      return snap.data() as UserProfileData;
+    }
+    throw err;
+  }
 }
+
+const inFlightEnsures = new Map<string, Promise<UserProfileData>>();
 
 /**
  * Ensures user profile exists in Firestore. If missing, creates it safely.
+ * Includes in-flight deduplication to prevent concurrent login race conditions.
  */
 export async function ensureUserProfile(user: User): Promise<UserProfileData> {
-  const userRef = doc(db, "users", user.uid);
-  const snap = await getDoc(userRef);
-
-  if (snap.exists()) {
-    return snap.data() as UserProfileData;
+  const existing = inFlightEnsures.get(user.uid);
+  if (existing) {
+    return existing;
   }
 
-  return createUserProfile(user);
+  const promise = (async () => {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+
+      if (snap.exists()) {
+        return snap.data() as UserProfileData;
+      }
+
+      return await createUserProfile(user);
+    } finally {
+      inFlightEnsures.delete(user.uid);
+    }
+  })();
+
+  inFlightEnsures.set(user.uid, promise);
+  return promise;
 }
 
 /**
