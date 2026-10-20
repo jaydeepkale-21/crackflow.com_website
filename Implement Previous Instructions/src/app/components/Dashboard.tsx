@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Download,
   ExternalLink,
+  Clock,
 } from "lucide-react";
 import { openBillingPortal } from "../../services/api";
 
@@ -35,7 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [downloadInfo, setDownloadInfo] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const handleSelectPlan = async (planId: "starter" | "pro" | "lifetime") => {
+  const handleSelectPlan = async (planId: string) => {
     setCheckoutLoading(planId);
     setDemoNotice(null);
     setDownloadInfo(null);
@@ -224,6 +225,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {hasActiveAccess ? "Active Interview License Granted" : "Upgrade Required to Start Interviews"}
                   </strong>
                 </p>
+
+                {backendUser?.remainingSeconds !== undefined && backendUser.remainingSeconds > 0 && (
+                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
+                    <span className="text-xs text-neutral-300 flex items-center gap-1.5 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" /> Remaining Time Balance
+                    </span>
+                    <span className="text-xs font-mono font-bold text-amber-300">
+                      {Math.floor(backendUser.remainingSeconds / 3600) > 0 ? `${Math.floor(backendUser.remainingSeconds / 3600)}h ` : ""}
+                      {Math.floor((backendUser.remainingSeconds % 3600) / 60)}m ({backendUser.remainingSeconds}s)
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

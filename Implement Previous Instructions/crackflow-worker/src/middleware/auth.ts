@@ -219,11 +219,57 @@ export async function requireAuthenticatedUser(
   }
 }
 
+import {
+  DEFAULT_MONTHLY_FAIR_USE_SECONDS,
+  DEFAULT_YEARLY_FAIR_USE_SECONDS,
+  DEFAULT_LIFETIME_FAIR_USE_SECONDS,
+  DEFAULT_AUTH_CACHE_TTL_MS,
+} from "../config/plans";
+
 const entitlementCache = new Map<string, { profile: any; expiresAt: number }>();
 
 /**
- * Shared helper: Enforces active paid subscription/lifetime license.
- * Throws HttpError(403) on failure with UPGRADE_REQUIRED.
+ * Event-driven cache invalidation: Clears isolate-local cached entitlement for a user.
+ */
+export function invalidateEntitlementCache(uid: string): void {
+  entitlementCache.delete(uid);
+}
+
+/**
+ * Event-driven cache update: Updates isolate-local cached entitlement with fresh authoritative state.
+ */
+export function updateCachedEntitlement(uid: string, profile: any): void {
+  entitlementCache.set(uid, {
+    profile,
+    expiresAt: Date.now() + DEFAULT_AUTH_CACHE_TTL_MS,
+  });
+}
+
+/**
+ * Event-driven cache update: Updates cached screen solves balance safely.
+ */
+export function updateCachedEntitlementScreenSolves(uid: string, remainingSolves: number): void {
+  const cached = entitlementCache.get(uid);
+  if (cached && cached.profile) {
+    cached.profile.screenSolvesRemaining = remainingSolves;
+  }
+}
+
+/**
+ * Retrieves valid cached profile if available and not expired.
+ */
+export function getCachedProfile(uid: string): any | null {
+  const cached = entitlementCache.get(uid);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.profile;
+  }
+  return null;
+}
+
+/**
+ * Shared helper: Enforces active paid subscription/pack entitlement.
+ * Authoritative time & fair-use balance calculation.
+ * Throws HttpError(403) on failure with UPGRADE_REQUIRED or USAGE_EXHAUSTED.
  */
 export async function requireActiveEntitlement(
   user: AuthenticatedUser,
@@ -239,23 +285,17 @@ export async function requireActiveEntitlement(
   if (cached && cached.expiresAt > now) {
     const remainingSec = Math.round((cached.expiresAt - now) / 1000);
     cacheStatus = `HIT (expires in ${remainingSec}s)`;
-    console.log(`⚡ [Entitlement Cache] HIT for ${user.uid} (${remainingSec}s remaining of 30m cache)`);
     profile = cached.profile;
   } else {
     try {
       profile = await fetchUserFromFirestore(user.uid, user.rawToken, env);
       if (profile) {
-        // Cache paid entitlements for 30 minutes (1,800,000 ms)
-        const isPaid = (profile.subscriptionStatus === "active" || profile.lifetime === true) && 
-                       ["starter", "pro", "lifetime"].includes(profile.planTier);
-        const ttl = isPaid ? 30 * 60 * 1000 : 5 * 1000;
+        // Safe 60s bounded fallback cache TTL across pack and subscription tiers
+        const ttl = DEFAULT_AUTH_CACHE_TTL_MS;
         entitlementCache.set(user.uid, { profile, expiresAt: now + ttl });
-        cacheStatus = `MISS (Cached for ${isPaid ? "30m" : "5s"})`;
-        console.log(`🔍 [Entitlement Cache] MISS for ${user.uid}. Fetched from Firestore (Cached for ${isPaid ? "30m" : "5s"})`);
+        cacheStatus = `MISS (Cached for ${ttl / 1000}s)`;
       } else {
-        // User document does not exist in Firestore! Wipe cache immediately
         entitlementCache.delete(user.uid);
-        console.warn(`🚫 [Entitlement] User document not found in Firestore for ${user.uid}. Evicted from cache.`);
       }
     } catch (err: any) {
       console.error(`[requireActiveEntitlement] Error reading profile for ${user.uid}:`, err);
@@ -265,27 +305,130 @@ export async function requireActiveEntitlement(
   const planTier = profile?.planTier || "none";
   const subscriptionStatus = profile?.subscriptionStatus || "none";
   const isLifetime = profile?.lifetime === true || planTier === "lifetime";
-  const isActive = subscriptionStatus === "active" || isLifetime;
-  const hasActiveAccess = isActive && ["starter", "pro", "lifetime"].includes(planTier);
+
+  // Determine accessType
+  const isPack =
+    profile?.accessType === "pack" ||
+    ["interview_1h", "interview_6h", "interview_24h"].includes(planTier);
+  const isSub =
+    profile?.accessType === "subscription" ||
+    ["monthly", "yearly", "starter", "pro", "lifetime"].includes(planTier);
+
+  const accessType: "pack" | "subscription" = isPack ? "pack" : "subscription";
+
+  let remainingSeconds = 0;
+  let hasActiveAccess = false;
+  let errorCode = "UPGRADE_REQUIRED";
+  let failureReason = "An active paid plan is required to start an interview.";
+
+  if (isPack) {
+    // Pack-based time access
+    const totalSec =
+      profile?.packTotalSeconds ||
+      (planTier === "interview_1h"
+        ? 3600
+        : planTier === "interview_6h"
+        ? 21600
+        : planTier === "interview_24h"
+        ? 86400
+        : 0);
+    const usedSec = profile?.packUsedSeconds || 0;
+    remainingSeconds = Math.max(0, totalSec - usedSec);
+
+    const isPackExpired = profile?.packExpiresAt
+      ? new Date(profile.packExpiresAt).getTime() < now
+      : false;
+
+    if (isPackExpired) {
+      errorCode = "EXPIRED";
+      failureReason = "Your CrackFlow interview pack has reached its calendar expiration date.";
+      hasActiveAccess = false;
+    } else if (remainingSeconds <= 0) {
+      errorCode = "USAGE_EXHAUSTED";
+      failureReason = "Your interview time has been exhausted. Please purchase additional hours to continue.";
+      hasActiveAccess = false;
+    } else {
+      hasActiveAccess = true;
+    }
+  } else if (isSub) {
+    // Subscription-based access (with internal fair-use tracking)
+    const isActive = subscriptionStatus === "active" || isLifetime;
+    const isPeriodExpired =
+      !isLifetime && profile?.currentPeriodEnd
+        ? new Date(profile.currentPeriodEnd).getTime() < now
+        : false;
+
+    // Check if new billing cycle started -> reset fair-use if applicable
+    let fairUseUsed = profile?.subscriptionUsedSeconds || 0;
+    if (
+      profile?.currentPeriodStart &&
+      profile?.lastFairUseResetPeriod &&
+      profile.lastFairUseResetPeriod !== profile.currentPeriodStart
+    ) {
+      // Billing cycle renewed: reset fair use used to 0
+      fairUseUsed = 0;
+    }
+
+    const defaultFairUse = isLifetime
+      ? DEFAULT_LIFETIME_FAIR_USE_SECONDS
+      : planTier === "yearly"
+      ? DEFAULT_YEARLY_FAIR_USE_SECONDS
+      : DEFAULT_MONTHLY_FAIR_USE_SECONDS;
+
+    const fairUseTotal = profile?.subscriptionFairUseSeconds || defaultFairUse;
+    remainingSeconds = Math.max(0, fairUseTotal - fairUseUsed);
+
+    if (!isActive) {
+      errorCode = "UPGRADE_REQUIRED";
+      failureReason = "An active subscription is required to access CrackFlow.";
+      hasActiveAccess = false;
+    } else if (isPeriodExpired) {
+      errorCode = "EXPIRED";
+      failureReason = "Your CrackFlow subscription billing period has expired. Please renew.";
+      hasActiveAccess = false;
+    } else if (remainingSeconds <= 0) {
+      errorCode = "USAGE_EXHAUSTED";
+      failureReason = "Fair-use interview limit reached for the current billing cycle. Please contact support.";
+      hasActiveAccess = false;
+    } else {
+      hasActiveAccess = true;
+    }
+  }
 
   if (!hasActiveAccess) {
     entitlementCache.delete(user.uid);
     throw new HttpError(
       403,
-      "UPGRADE_REQUIRED",
-      customMessage || "An active paid plan is required to start an interview.",
+      errorCode,
+      customMessage || failureReason,
       {
         hasActiveAccess: false,
         planTier,
+        accessType,
+        remainingSeconds,
       }
     );
   }
+
+  const isUnlimitedSolves = isSub;
+  const screenSolvesRemaining = profile?.screenSolvesRemaining ?? (
+    isPack
+      ? (planTier === "interview_1h" ? 234 : planTier === "interview_6h" ? 587 : planTier === "interview_24h" ? 1175 : 0)
+      : (planTier === "yearly" || isLifetime ? 5880 : 1175)
+  );
+  const screenshotAccessAllowed = hasActiveAccess && screenSolvesRemaining > 0;
 
   return {
     ...user,
     profile,
     hasActiveAccess: true,
     planTier,
+    accessType,
+    remainingSeconds,
     cacheStatus,
+    screenSolvesRemaining,
+    isUnlimitedSolves,
+    screenshotAccessAllowed,
   };
 }
+

@@ -1,24 +1,137 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidOptionalString(val, maxLen) {
+      return val == null || (val is string && val.size() <= maxLen);
+    }
+
+    // ==========================================
+    // DOCUMENT CREATION VALIDATION
+    // Ensures initial client profile creation cannot forge paid access
+    // ==========================================
+    function isValidNewUserProfile(userId) {
+      let data = request.resource.data;
+      let allowedKeys = [
+        'uid', 'email', 'displayName', 'photoURL',
+        'planTier', 'subscriptionStatus', 'paymentProvider',
+        'customerId', 'subscriptionId', 'lifetime',
+        'currentPeriodStart', 'currentPeriodEnd',
+        'createdAt', 'updatedAt'
+      ];
+
+      return isOwner(userId)
+        // Strictly only permitted initial keys
+        && data.keys().hasOnly(allowedKeys)
+        && data.uid == userId
+        && isValidOptionalString(data.email, 200)
+        && isValidOptionalString(data.displayName, 100)
+        && isValidOptionalString(data.photoURL, 500)
+        // Initial plan and status must be strictly unpaid / default
+        && data.planTier == 'none'
+        && data.subscriptionStatus == 'none'
+        && data.lifetime == false
+        && data.customerId == null
+        && data.subscriptionId == null
+        && data.currentPeriodStart == null
+        && data.currentPeriodEnd == null
+        && (data.paymentProvider == 'none' || data.paymentProvider == 'dummy')
+        && (data.createdAt is timestamp)
+        && (data.updatedAt is timestamp)
+        // Disallow all server-authoritative fields on creation
+        && !('packProductId' in data)
+        && !('packTotalSeconds' in data)
+        && !('packUsedSeconds' in data)
+        && !('packExpiresAt' in data)
+        && !('packPurchasedAt' in data)
+        && !('accessType' in data)
+        && !('subscriptionFairUseSeconds' in data)
+        && !('subscriptionUsedSeconds' in data)
+        && !('lastFairUseResetPeriod' in data)
+        && !('screenSolvesTotal' in data)
+        && !('screenSolvesUsed' in data)
+        && !('screenSolvesRemaining' in data)
+        && !('isUnlimitedSolves' in data)
+        && !('screenQuotaPeriodStart' in data)
+        && !('screenQuotaPeriodEnd' in data)
+        && !('lastScreenshotReservation' in data);
+    }
+
+    // ==========================================
+    // DOCUMENT UPDATE VALIDATION
+    // Enforces strict allowlist of harmless profile attributes.
+    // All billing, entitlements, packs, quotas, and sessions are server-authoritative.
+    // ==========================================
+    function isValidProfileUpdate(userId) {
+      let diff = request.resource.data.diff(resource.data);
+      let affected = diff.affectedKeys();
+      let allowedUpdateKeys = ['displayName', 'photoURL', 'updatedAt'];
+
+      return isOwner(userId)
+        // Must maintain document identity
+        && resource.data.uid == userId
+        && request.resource.data.uid == userId
+        // ONLY allow modifications to harmless profile fields
+        && affected.hasOnly(allowedUpdateKeys)
+        // Identity fields cannot be altered or removed
+        && (!affected.hasAny(['uid', 'email']))
+        // If displayName is modified, validate type & length
+        && (!affected.hasAny(['displayName']) || isValidOptionalString(request.resource.data.displayName, 100))
+        // If photoURL is modified, validate type & length
+        && (!affected.hasAny(['photoURL']) || isValidOptionalString(request.resource.data.photoURL, 500))
+        // If updatedAt is modified, validate timestamp
+        && (!affected.hasAny(['updatedAt']) || request.resource.data.updatedAt is timestamp);
+    }
+
+    // ==========================================
+    // COLLECTION RULES
+    // ==========================================
+
     // User accounts collection
     match /users/{userId} {
-      // Users can read their own profile document
-      allow read: if request.auth != null && request.auth.uid == userId;
-      
-      // Users can create their initial profile document
-      allow create: if request.auth != null && request.auth.uid == userId;
-      
-      // Development Phase: Users can update their own document for dummy plan selection
-      // NOTE: When real Cloudflare Worker + Stripe/Razorpay webhooks are deployed,
-      // update writes will be restricted to Cloudflare Worker Admin SDK.
-      allow update: if request.auth != null && request.auth.uid == userId;
-      
-      // Users cannot delete user documents
+      // Users can only read their own profile document
+      allow read: if isOwner(userId);
+
+      // Controlled initial profile creation
+      allow create: if isValidNewUserProfile(userId);
+
+      // Strictly controlled harmless profile updates (displayName, photoURL, updatedAt)
+      allow update: if isValidProfileUpdate(userId);
+
+      // Clients cannot delete user documents
       allow delete: if false;
     }
-    
+
+    // Sensitive server-managed collections (Strictly deny all direct client access)
+    // Managed exclusively by Cloudflare Worker via Google Service Account (Admin REST API)
+    match /sessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /usage/{docId} {
+      allow read, write: if false;
+    }
+
+    match /stripeWebhookEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if false;
+    }
+
     // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;

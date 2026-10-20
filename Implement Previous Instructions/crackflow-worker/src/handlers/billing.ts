@@ -6,47 +6,36 @@ import {
   recordWebhookEvent,
   getUserByCustomerId,
 } from "../lib/firestore";
-import { HttpError } from "../middleware/auth";
+import { HttpError, invalidateEntitlementCache } from "../middleware/auth";
 
-type PlanTier = "starter" | "pro" | "lifetime";
+import {
+  DEFAULT_MONTHLY_FAIR_USE_SECONDS,
+  DEFAULT_YEARLY_FAIR_USE_SECONDS,
+  DEFAULT_LIFETIME_FAIR_USE_SECONDS,
+  SCREEN_SOLVES_QUOTAS,
+} from "../config/plans";
 
-/**
- * Maps planId to Stripe Price ID from server environment.
- */
-function getPriceIdForPlan(planId: string, env: Env): { priceId: string; mode: "subscription" | "payment" } {
-  if (planId === "starter") {
-    if (!env.STRIPE_STARTER_PRICE_ID) {
-      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Starter price ID is not configured.");
-    }
-    return { priceId: env.STRIPE_STARTER_PRICE_ID, mode: "subscription" };
-  }
+type PlanTier =
+  | "starter"
+  | "pro"
+  | "lifetime"
+  | "INTERVIEW_1H"
+  | "INTERVIEW_6H"
+  | "INTERVIEW_24H"
+  | "MONTHLY"
+  | "YEARLY";
 
-  if (planId === "pro") {
-    if (!env.STRIPE_PRO_PRICE_ID) {
-      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Pro price ID is not configured.");
-    }
-    return { priceId: env.STRIPE_PRO_PRICE_ID, mode: "subscription" };
-  }
-
-  if (planId === "lifetime") {
-    if (!env.STRIPE_LIFETIME_PRICE_ID) {
-      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Lifetime price ID is not configured.");
-    }
-    return { priceId: env.STRIPE_LIFETIME_PRICE_ID, mode: "payment" };
-  }
-
-  throw new HttpError(400, "INVALID_PLAN", "Invalid or unsupported plan selected. Allowed: starter, pro, lifetime.");
-}
-
-/**
- * Resolves plan tier from Stripe Price ID or metadata
- */
-function resolvePlanFromPriceId(priceId: string | undefined, env: Env): PlanTier {
-  if (priceId && priceId === env.STRIPE_LIFETIME_PRICE_ID) return "lifetime";
-  if (priceId && priceId === env.STRIPE_PRO_PRICE_ID) return "pro";
-  if (priceId && priceId === env.STRIPE_STARTER_PRICE_ID) return "starter";
-  return "starter";
-}
+export const RAZORPAY_PLAN_AMOUNTS: Record<string, { amount: number; currency: string; name: string }> = {
+  INTERVIEW_1H: { amount: 19900, currency: "INR", name: "CrackFlow 2 Minutes Test Pack" },
+  INTERVIEW_6H: { amount: 49900, currency: "INR", name: "CrackFlow 6 Hours Interview Pack" },
+  INTERVIEW_24H: { amount: 99900, currency: "INR", name: "CrackFlow 24 Hours / Whole Day Pack" },
+  MONTHLY: { amount: 99900, currency: "INR", name: "CrackFlow Unlimited Monthly Subscription" },
+  YEARLY: { amount: 499900, currency: "INR", name: "CrackFlow Unlimited Yearly Subscription" },
+  // Backward compatibility
+  starter: { amount: 49900, currency: "INR", name: "CrackFlow Starter Plan (Monthly)" },
+  pro: { amount: 99900, currency: "INR", name: "CrackFlow Pro Plan (Monthly)" },
+  lifetime: { amount: 499900, currency: "INR", name: "CrackFlow Lifetime Access" },
+};
 
 /**
  * Constant-time comparison for hex signature strings
@@ -79,6 +68,44 @@ async function computeHmacSha256Hex(secret: string, data: string): Promise<strin
 }
 
 /**
+ * Maps planId to Stripe Price ID from server environment.
+ */
+function getPriceIdForPlan(planId: string, env: Env): { priceId: string; mode: "subscription" | "payment" } {
+  if (planId === "starter" || planId === "INTERVIEW_1H") {
+    if (!env.STRIPE_STARTER_PRICE_ID) {
+      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Starter price ID is not configured.");
+    }
+    return { priceId: env.STRIPE_STARTER_PRICE_ID, mode: "subscription" };
+  }
+
+  if (planId === "pro" || planId === "MONTHLY" || planId === "INTERVIEW_6H") {
+    if (!env.STRIPE_PRO_PRICE_ID) {
+      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Pro price ID is not configured.");
+    }
+    return { priceId: env.STRIPE_PRO_PRICE_ID, mode: "subscription" };
+  }
+
+  if (planId === "lifetime" || planId === "YEARLY" || planId === "INTERVIEW_24H") {
+    if (!env.STRIPE_LIFETIME_PRICE_ID) {
+      throw new HttpError(500, "STRIPE_NOT_CONFIGURED", "Stripe Lifetime price ID is not configured.");
+    }
+    return { priceId: env.STRIPE_LIFETIME_PRICE_ID, mode: "payment" };
+  }
+
+  throw new HttpError(400, "INVALID_PLAN", "Invalid or unsupported plan selected.");
+}
+
+/**
+ * Resolves plan tier from Stripe Price ID or metadata
+ */
+function resolvePlanFromPriceId(priceId: string | undefined, env: Env): any {
+  if (priceId && priceId === env.STRIPE_LIFETIME_PRICE_ID) return "lifetime";
+  if (priceId && priceId === env.STRIPE_PRO_PRICE_ID) return "pro";
+  if (priceId && priceId === env.STRIPE_STARTER_PRICE_ID) return "starter";
+  return "starter";
+}
+
+/**
  * Verifies Stripe Webhook Signature Header
  */
 async function verifyStripeSignature(rawBody: string, signatureHeader: string | null, secret: string): Promise<boolean> {
@@ -96,7 +123,6 @@ async function verifyStripeSignature(rawBody: string, signatureHeader: string | 
 
   if (!timestamp || signatures.length === 0) return false;
 
-  // Tolerance check (5 minutes = 300 seconds)
   const nowSec = Math.floor(Date.now() / 1000);
   const tsNum = parseInt(timestamp, 10);
   if (isNaN(tsNum) || Math.abs(nowSec - tsNum) > 300) {
@@ -110,11 +136,170 @@ async function verifyStripeSignature(rawBody: string, signatureHeader: string | 
   return signatures.some((sig) => safeEqual(sig, expectedSig));
 }
 
-export const RAZORPAY_PLAN_AMOUNTS: Record<PlanTier, { amount: number; currency: string; name: string }> = {
-  starter: { amount: 49900, currency: "INR", name: "CrackFlow Starter Plan (Monthly)" },
-  pro: { amount: 99900, currency: "INR", name: "CrackFlow Pro Plan (Monthly)" },
-  lifetime: { amount: 499900, currency: "INR", name: "CrackFlow Lifetime Access" },
-};
+
+/**
+ * Centrally grants entitlement in Firestore for both payment verification and webhooks.
+ * Safely handles multi-pack purchases by aggregating existing remaining balance.
+ */
+export async function grantPurchasedEntitlement(
+  uid: string,
+  planId: string,
+  paymentId: string,
+  env: Env
+): Promise<{ planTier: string; expiresAt: string | null; remainingSeconds: number }> {
+  const now = new Date();
+  const currentProfile = await fetchUserFromFirestore(uid, "", env);
+
+  const isPack = ["INTERVIEW_1H", "INTERVIEW_6H", "INTERVIEW_24H"].includes(planId);
+  const isMonthly = planId === "MONTHLY" || planId === "starter" || planId === "pro";
+  const isYearly = planId === "YEARLY";
+  const isLifetime = planId === "lifetime";
+
+  let updates: Partial<FirestoreUserProfile> = {};
+  let expiresAt: string | null = null;
+  let remainingSeconds = 0;
+  const finalPlanTier = planId.toLowerCase() as any;
+
+  if (isPack) {
+    const packSeconds = planId === "INTERVIEW_1H" ? 3600 : planId === "INTERVIEW_6H" ? 21600 : 86400;
+    const validityDays = planId === "INTERVIEW_1H" ? 30 : planId === "INTERVIEW_6H" ? 90 : 180;
+    const newExpiryDate = new Date(now.getTime() + validityDays * 24 * 60 * 60 * 1000);
+
+    // Multi-pack purchase handling: aggregate existing balance safely (Requirement 18)
+    const existingTotal = currentProfile?.packTotalSeconds || 0;
+    const existingUsed = currentProfile?.packUsedSeconds || 0;
+    const existingRemaining = Math.max(0, existingTotal - existingUsed);
+
+    const updatedTotal = existingRemaining + packSeconds;
+    remainingSeconds = updatedTotal;
+
+    // Extend calendar expiration date to whichever is further in the future
+    let finalExpiry = newExpiryDate.toISOString();
+    if (currentProfile?.packExpiresAt) {
+      const existingExpiryMs = new Date(currentProfile.packExpiresAt).getTime();
+      if (existingExpiryMs > newExpiryDate.getTime()) {
+        finalExpiry = currentProfile.packExpiresAt;
+      }
+    }
+    expiresAt = finalExpiry;
+
+    // Screenshot solves quota allocation
+    const packSolvesQuota =
+      SCREEN_SOLVES_QUOTAS[planId as keyof typeof SCREEN_SOLVES_QUOTAS] ||
+      (planId === "INTERVIEW_1H" ? 234 : planId === "INTERVIEW_6H" ? 587 : 1175);
+    const existingSolvesRemaining = currentProfile?.screenSolvesRemaining || 0;
+    const existingSolvesTotal = currentProfile?.screenSolvesTotal || 0;
+    const updatedSolvesRemaining = existingSolvesRemaining + packSolvesQuota;
+    const updatedSolvesTotal = existingSolvesTotal + packSolvesQuota;
+
+    updates = {
+      planTier: finalPlanTier,
+      accessType: "pack",
+      packProductId: planId as any,
+      packTotalSeconds: updatedTotal,
+      packUsedSeconds: 0, // Reset counter since packTotalSeconds now holds the aggregate remaining
+      packExpiresAt: finalExpiry,
+      packPurchasedAt: now.toISOString(),
+      subscriptionStatus: "active",
+      paymentProvider: "razorpay",
+      subscriptionId: paymentId,
+      customerId: uid,
+      lifetime: false,
+      currentPeriodStart: now.toISOString(),
+      currentPeriodEnd: finalExpiry,
+      screenSolvesTotal: updatedSolvesTotal,
+      screenSolvesRemaining: updatedSolvesRemaining,
+      screenSolvesUsed: currentProfile?.screenSolvesUsed || 0,
+      isUnlimitedSolves: false,
+      screenQuotaPeriodStart: now.toISOString(),
+      screenQuotaPeriodEnd: finalExpiry,
+      updatedAt: now.toISOString(),
+    };
+  } else if (isMonthly) {
+    const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    expiresAt = periodEnd;
+    remainingSeconds = DEFAULT_MONTHLY_FAIR_USE_SECONDS;
+    const subSolvesQuota = SCREEN_SOLVES_QUOTAS.MONTHLY; // 1175
+    updates = {
+      planTier: planId === "MONTHLY" ? "monthly" : (planId as any),
+      accessType: "subscription",
+      subscriptionStatus: "active",
+      subscriptionFairUseSeconds: DEFAULT_MONTHLY_FAIR_USE_SECONDS,
+      subscriptionUsedSeconds: 0,
+      paymentProvider: "razorpay",
+      subscriptionId: paymentId,
+      customerId: uid,
+      lifetime: false,
+      currentPeriodStart: now.toISOString(),
+      currentPeriodEnd: periodEnd,
+      lastFairUseResetPeriod: now.toISOString(),
+      screenSolvesTotal: subSolvesQuota,
+      screenSolvesRemaining: subSolvesQuota,
+      screenSolvesUsed: 0,
+      isUnlimitedSolves: true,
+      screenQuotaPeriodStart: now.toISOString(),
+      screenQuotaPeriodEnd: periodEnd,
+      updatedAt: now.toISOString(),
+    };
+  } else if (isYearly) {
+    const periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    expiresAt = periodEnd;
+    remainingSeconds = DEFAULT_YEARLY_FAIR_USE_SECONDS;
+    const subSolvesQuota = SCREEN_SOLVES_QUOTAS.YEARLY; // 5880
+    updates = {
+      planTier: "yearly",
+      accessType: "subscription",
+      subscriptionStatus: "active",
+      subscriptionFairUseSeconds: DEFAULT_YEARLY_FAIR_USE_SECONDS,
+      subscriptionUsedSeconds: 0,
+      paymentProvider: "razorpay",
+      subscriptionId: paymentId,
+      customerId: uid,
+      lifetime: false,
+      currentPeriodStart: now.toISOString(),
+      currentPeriodEnd: periodEnd,
+      lastFairUseResetPeriod: now.toISOString(),
+      screenSolvesTotal: subSolvesQuota,
+      screenSolvesRemaining: subSolvesQuota,
+      screenSolvesUsed: 0,
+      isUnlimitedSolves: true,
+      screenQuotaPeriodStart: now.toISOString(),
+      screenQuotaPeriodEnd: periodEnd,
+      updatedAt: now.toISOString(),
+    };
+  } else if (isLifetime) {
+    expiresAt = null;
+    remainingSeconds = DEFAULT_LIFETIME_FAIR_USE_SECONDS;
+    const subSolvesQuota = SCREEN_SOLVES_QUOTAS.lifetime; // 5880
+    updates = {
+      planTier: "lifetime",
+      accessType: "subscription",
+      subscriptionStatus: "active",
+      subscriptionFairUseSeconds: DEFAULT_LIFETIME_FAIR_USE_SECONDS,
+      subscriptionUsedSeconds: 0,
+      paymentProvider: "razorpay",
+      subscriptionId: paymentId,
+      customerId: uid,
+      lifetime: true,
+      currentPeriodStart: now.toISOString(),
+      currentPeriodEnd: null,
+      screenSolvesTotal: subSolvesQuota,
+      screenSolvesRemaining: subSolvesQuota,
+      screenSolvesUsed: 0,
+      isUnlimitedSolves: true,
+      screenQuotaPeriodStart: now.toISOString(),
+      screenQuotaPeriodEnd: null,
+      updatedAt: now.toISOString(),
+    };
+  }
+
+  await updateUserInFirestore(uid, updates, env);
+  invalidateEntitlementCache(uid);
+  console.log(`💳 [Billing] Entitlement granted for ${uid}: ${planId} (${remainingSeconds}s total, ${updates.screenSolvesRemaining} screen solves)`);
+  return { planTier: updates.planTier || planId, expiresAt, remainingSeconds };
+}
+
+
 
 /**
  * POST /v1/billing/checkout
@@ -133,7 +318,7 @@ export async function handleCreateCheckout(
 
   const planId = body?.planId;
   if (!planId || typeof planId !== "string") {
-    throw new HttpError(400, "INVALID_PLAN", "Missing or invalid planId. Allowed: starter, pro, lifetime.");
+    throw new HttpError(400, "INVALID_PLAN", "Missing or invalid planId.");
   }
 
   // 1. Razorpay Order Flow (Active when credentials provided)
@@ -142,8 +327,10 @@ export async function handleCreateCheckout(
     (!body?.provider && Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET));
 
   if (isRazorpayRequested && env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
-    const validPlan = (["starter", "pro", "lifetime"].includes(planId) ? planId : "pro") as PlanTier;
-    const planConfig = RAZORPAY_PLAN_AMOUNTS[validPlan] || RAZORPAY_PLAN_AMOUNTS.pro;
+    const validPlan = Object.keys(RAZORPAY_PLAN_AMOUNTS).includes(planId)
+      ? planId
+      : (["starter", "pro", "lifetime"].includes(planId) ? planId : "INTERVIEW_1H");
+    const planConfig = RAZORPAY_PLAN_AMOUNTS[validPlan] || RAZORPAY_PLAN_AMOUNTS.INTERVIEW_1H;
     const authString = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
     const receipt = `rcpt_${user.uid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10)}_${Date.now().toString().slice(-6)}`;
 
@@ -513,7 +700,7 @@ async function processStripeEvent(event: any, env: Env): Promise<string | null> 
         : null;
 
       const updates: Partial<FirestoreUserProfile> = {
-        planTier,
+        planTier: planTier.toLowerCase() as any,
         subscriptionStatus: "active",
         paymentProvider: "stripe",
         customerId,
@@ -523,6 +710,7 @@ async function processStripeEvent(event: any, env: Env): Promise<string | null> 
         currentPeriodEnd: periodEnd,
         updatedAt: new Date().toISOString(),
       };
+
 
       await updateUserInFirestore(uid, updates, env);
       return uid;
@@ -585,7 +773,7 @@ async function processStripeEvent(event: any, env: Env): Promise<string | null> 
       const planTier: PlanTier = (dataObject.metadata?.planId as PlanTier) || resolvePlanFromPriceId(priceId, env);
 
       const updates: Partial<FirestoreUserProfile> = {
-        planTier,
+        planTier: planTier.toLowerCase() as any,
         subscriptionStatus,
         paymentProvider: "stripe",
         subscriptionId: dataObject.id,
@@ -593,6 +781,7 @@ async function processStripeEvent(event: any, env: Env): Promise<string | null> 
         currentPeriodEnd: periodEnd,
         updatedAt: new Date().toISOString(),
       };
+
 
       await updateUserInFirestore(uid, updates, env);
       return uid;
@@ -732,7 +921,7 @@ export async function handleVerifyRazorpayPayment(
   }
 
   // 2. Resolve verified plan tier (inspecting Razorpay Order notes if reachable)
-  let verifiedPlan: PlanTier = (planId as PlanTier) || "pro";
+  let verifiedPlan: string = planId || "INTERVIEW_1H";
   if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
     try {
       const authString = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
@@ -741,8 +930,8 @@ export async function handleVerifyRazorpayPayment(
       });
       if (orderCheckRes.ok) {
         const orderData: any = await orderCheckRes.json();
-        if (orderData.notes?.planId && ["starter", "pro", "lifetime"].includes(orderData.notes.planId)) {
-          verifiedPlan = orderData.notes.planId as PlanTier;
+        if (orderData.notes?.planId && Object.keys(RAZORPAY_PLAN_AMOUNTS).includes(orderData.notes.planId)) {
+          verifiedPlan = orderData.notes.planId;
         }
       }
     } catch (orderErr) {
@@ -750,40 +939,56 @@ export async function handleVerifyRazorpayPayment(
     }
   }
 
-  if (!["starter", "pro", "lifetime"].includes(verifiedPlan)) {
-    verifiedPlan = "pro";
+  if (!Object.keys(RAZORPAY_PLAN_AMOUNTS).includes(verifiedPlan)) {
+    verifiedPlan = "INTERVIEW_1H";
   }
 
-  // 3. Grant entitlement in Firestore
-  const now = new Date();
-  const isLifetime = verifiedPlan === "lifetime";
-  const periodEnd = isLifetime
-    ? null
-    : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Idempotency: verify if this paymentId was already processed to prevent duplicate quota grants
+  const alreadyProcessed = await checkWebhookEventProcessed(razorpay_payment_id, env);
+  if (alreadyProcessed) {
+    console.log(`[Razorpay Verify] Payment ${razorpay_payment_id} already processed. Returning idempotent response.`);
+    const currentProfile = await fetchUserFromFirestore(user.uid, "", env);
+    const existingTotal = currentProfile?.packTotalSeconds || 0;
+    const existingUsed = currentProfile?.packUsedSeconds || 0;
+    const remaining = Math.max(0, existingTotal - existingUsed);
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Payment already verified (idempotent replay).",
+        planTier: currentProfile?.planTier || verifiedPlan,
+        subscriptionStatus: "active",
+        hasActiveAccess: true,
+        expiresAt: currentProfile?.packExpiresAt || currentProfile?.currentPeriodEnd || null,
+        remainingSeconds: remaining,
+        deduplicated: true,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
 
-  const updates: Partial<FirestoreUserProfile> = {
-    planTier: verifiedPlan,
-    subscriptionStatus: "active",
-    paymentProvider: "razorpay",
-    subscriptionId: razorpay_payment_id,
-    customerId: user.uid,
-    lifetime: isLifetime,
-    currentPeriodStart: now.toISOString(),
-    currentPeriodEnd: periodEnd,
-    updatedAt: now.toISOString(),
-  };
+  // 3. Grant entitlement in Firestore (with multi-pack balance aggregation)
+  const grantResult = await grantPurchasedEntitlement(
+    user.uid,
+    verifiedPlan,
+    razorpay_payment_id,
+    env
+  );
 
-  await updateUserInFirestore(user.uid, updates, env);
-  console.log(`[Razorpay Verify] Entitlement successfully activated for ${user.uid} -> plan: ${verifiedPlan}`);
+  // 4. Record payment event to ensure future replayed verifications do not double-grant quota
+  await recordWebhookEvent(razorpay_payment_id, "payment.verified", user.uid, env);
 
   return new Response(
     JSON.stringify({
       success: true,
       message: "Payment verified and entitlement activated successfully.",
-      planTier: verifiedPlan,
+      planTier: grantResult.planTier,
       subscriptionStatus: "active",
       hasActiveAccess: true,
-      expiresAt: periodEnd,
+      expiresAt: grantResult.expiresAt,
+      remainingSeconds: grantResult.remainingSeconds,
     }),
     {
       status: 200,
@@ -795,6 +1000,8 @@ export async function handleVerifyRazorpayPayment(
 /**
  * POST /v1/billing/razorpay/webhook
  * Razorpay webhook handler for asynchronous payment events.
+ * Idempotent: checks and records event to avoid duplicate processing (Requirement 20).
+ * Handles payment.captured, order.paid, and refund.processed (Requirement 21).
  */
 export async function handleRazorpayWebhook(request: Request, env: Env): Promise<Response> {
   const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET || env.RAZORPAY_KEY_SECRET;
@@ -823,52 +1030,77 @@ export async function handleRazorpayWebhook(request: Request, env: Env): Promise
 
   const eventType = event.event;
   const payload = event.payload;
+  const eventId: string = event.id || payload?.payment?.entity?.id || `rzp_${Date.now()}`;
 
-  if (eventType === "payment.captured" || eventType === "order.paid") {
-    const payment = payload?.payment?.entity;
-    const order = payload?.order?.entity;
-    const notes = payment?.notes || order?.notes || {};
-    const uid = notes.uid;
-    const planId = (notes.planId as PlanTier) || "pro";
-
-    if (uid) {
-      const now = new Date();
-      const isLifetime = planId === "lifetime";
-      await updateUserInFirestore(
-        uid,
-        {
-          planTier: planId,
-          subscriptionStatus: "active",
-          paymentProvider: "razorpay",
-          subscriptionId: payment?.id || "rzp_webhook",
-          customerId: uid,
-          lifetime: isLifetime,
-          currentPeriodStart: now.toISOString(),
-          currentPeriodEnd: isLifetime ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: now.toISOString(),
-        },
-        env
-      );
-      console.log(`[Razorpay Webhook] Entitlement updated for ${uid} via ${eventType}`);
-    }
-  } else if (eventType === "payment.failed") {
-    const payment = payload?.payment?.entity;
-    const notes = payment?.notes || {};
-    const uid = notes.uid;
-    if (uid) {
-      await updateUserInFirestore(
-        uid,
-        {
-          subscriptionStatus: "past_due",
-          paymentProvider: "razorpay",
-          updatedAt: new Date().toISOString(),
-        },
-        env
-      );
-      console.log(`[Razorpay Webhook] Payment failed recorded for ${uid}`);
-    }
+  // Idempotency check: prevent duplicate webhooks from double-crediting (Requirement 20)
+  const alreadyProcessed = await checkWebhookEventProcessed(eventId, env);
+  if (alreadyProcessed) {
+    console.log(`[Razorpay Webhook] Event ${eventId} was already processed. Returning 200.`);
+    return new Response(JSON.stringify({ received: true, deduplicated: true }), { status: 200 });
   }
 
-  return new Response(JSON.stringify({ status: "ok", received: true }), { status: 200 });
+  try {
+    if (eventType === "payment.captured" || eventType === "order.paid") {
+      const payment = payload?.payment?.entity;
+      const order = payload?.order?.entity;
+      const notes = payment?.notes || order?.notes || {};
+      const uid = notes.uid;
+      const planId = (notes.planId as string) || "INTERVIEW_1H";
+
+      if (uid) {
+        await grantPurchasedEntitlement(uid, planId, payment?.id || "rzp_webhook", env);
+        await recordWebhookEvent(eventId, eventType, uid, env);
+        console.log(`[Razorpay Webhook] Entitlement granted for ${uid} via ${eventType}`);
+      }
+    } else if (eventType === "refund.processed" || eventType === "refund.created") {
+      // Refund handling: record refund, revoke active status (Requirement 21)
+      const refund = payload?.refund?.entity;
+      const payment = payload?.payment?.entity;
+      const notes = refund?.notes || payment?.notes || {};
+      const uid = notes.uid;
+
+      if (uid) {
+        const now = new Date().toISOString();
+        await updateUserInFirestore(
+          uid,
+          {
+            subscriptionStatus: "canceled",
+            packExpiresAt: now, // Expire current pack immediately upon refund
+            screenSolvesRemaining: 0,
+            updatedAt: now,
+          },
+          env
+        );
+        invalidateEntitlementCache(uid);
+        await recordWebhookEvent(eventId, eventType, uid, env);
+        console.log(`[Razorpay Webhook] Refund processed for ${uid}. Access revoked.`);
+      }
+    } else if (eventType === "payment.failed") {
+      const payment = payload?.payment?.entity;
+      const notes = payment?.notes || {};
+      const uid = notes.uid;
+      if (uid) {
+        await updateUserInFirestore(
+          uid,
+          {
+            subscriptionStatus: "past_due",
+            paymentProvider: "razorpay",
+            updatedAt: new Date().toISOString(),
+          },
+          env
+        );
+        invalidateEntitlementCache(uid);
+        await recordWebhookEvent(eventId, eventType, uid, env);
+      }
+    }
+
+    return new Response(JSON.stringify({ status: "ok", received: true }), { status: 200 });
+  } catch (err: any) {
+    console.error(`[Razorpay Webhook] Error processing event ${eventId}:`, err);
+    return new Response(JSON.stringify({ error: "WEBHOOK_FAILED", message: err?.message }), {
+      status: 500,
+    });
+  }
 }
+
 

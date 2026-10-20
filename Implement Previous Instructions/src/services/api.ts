@@ -13,11 +13,20 @@ export interface UserMeData {
   uid: string;
   email: string;
   displayName?: string;
-  planTier: "none" | "starter" | "pro" | "lifetime";
+  planTier: string;
   subscriptionStatus: "none" | "active" | "canceled" | "past_due" | "expired";
   hasActiveAccess: boolean;
   expiresAt?: string | null;
+  accessType?: "pack" | "subscription" | "none";
+  remainingSeconds?: number;
+  displayPlan?: string;
+  fairUse?: {
+    totalSeconds: number;
+    usedSeconds: number;
+    remainingSeconds: number;
+  };
 }
+
 
 export interface StripeCheckoutResponse {
   checkoutUrl: string;
@@ -150,11 +159,21 @@ async function fetchApi<T>(
 }
 
 /**
+ * Heartbeat & Session Configuration Constants
+ */
+export const HEARTBEAT_INTERVAL_SECONDS = 180;
+export const HEARTBEAT_INTERVAL_MS = 180_000;
+export const STALE_SESSION_TIMEOUT_SECONDS = 900;
+export const STALE_SESSION_TIMEOUT_MS = 900_000;
+
+/**
  * GET /v1/me
  * Retrieves full user account and active entitlement details from Cloudflare backend.
+ * Pass refresh = true to force an authoritative fresh read from Firestore.
  */
-export async function getMe(): Promise<ApiResponse<UserMeData>> {
-  return fetchApi<UserMeData>("/v1/me", { method: "GET" });
+export async function getMe(refresh: boolean = false): Promise<ApiResponse<UserMeData>> {
+  const query = refresh ? "?refresh=true" : "";
+  return fetchApi<UserMeData>(`/v1/me${query}`, { method: "GET" });
 }
 
 /**

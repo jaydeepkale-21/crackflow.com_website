@@ -4,10 +4,13 @@ import {
   requireActiveEntitlement,
   HttpError,
 } from "./middleware/auth";
+import { checkRateLimit } from "./middleware/rateLimit";
+import { recordApiUsage } from "./lib/firestore";
 import { handleHealth } from "./handlers/health";
 import { handleMe } from "./handlers/me";
 import { handleInstallerDownload, handleVersion } from "./handlers/download";
 import { handleInterviewStart } from "./handlers/interview";
+import { handleSessionEnd, handleSessionHeartbeat } from "./handlers/sessionEnd";
 import { handleSttToken } from "./handlers/stt";
 import { handleAiComplete } from "./handlers/ai";
 import {
@@ -22,6 +25,7 @@ import {
   handleClaimExchangeCode,
   handlePollExchangeSession,
 } from "./handlers/authExchange";
+
 
 function setCorsHeaders(headers: Headers, request: Request, env: Env): void {
   const origin = request.headers.get("Origin");
@@ -49,7 +53,7 @@ function setCorsHeaders(headers: Headers, request: Request, env: Env): void {
 
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
-  headers.set("Access-Control-Expose-Headers", "X-Entitlement-Cache");
+  headers.set("Access-Control-Expose-Headers", "X-Entitlement-Cache, X-Screen-Solves-Remaining, X-Is-Unlimited");
   headers.set("Access-Control-Max-Age", "86400");
 }
 
@@ -61,8 +65,22 @@ function jsonResponse(data: any, status = 200, request: Request, env: Env): Resp
   return new Response(JSON.stringify(data), { status, headers });
 }
 
+function trackApiUsage(
+  uid: string,
+  endpoint: string,
+  isRejected: boolean,
+  isRateLimited: boolean,
+  env: Env,
+  ctx?: ExecutionContext
+): void {
+  const promise = recordApiUsage(uid, endpoint, isRejected, isRateLimited, env);
+  if (ctx && typeof ctx.waitUntil === "function") {
+    ctx.waitUntil(promise);
+  }
+}
+
 export default {
-  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method.toUpperCase();
@@ -93,7 +111,16 @@ export default {
       // 3. User Identity & Entitlement Status Check (Free or Paid)
       if (path === "/v1/me" && method === "GET") {
         const user = await requireAuthenticatedUser(request, env);
-        const res = await handleMe(user.decoded, user.rawToken, env);
+        const limit = checkRateLimit(user.uid, "/v1/me");
+        if (!limit.allowed && limit.response) {
+          trackApiUsage(user.uid, "/v1/me", true, true, env, ctx);
+          const headers = new Headers(limit.response.headers);
+          setCorsHeaders(headers, request, env);
+          return new Response(limit.response.body, { status: limit.response.status, headers });
+        }
+        trackApiUsage(user.uid, "/v1/me", false, false, env, ctx);
+        const forceFresh = url.searchParams.get("refresh") === "true";
+        const res = await handleMe(user.decoded, user.rawToken, env, forceFresh);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
@@ -136,8 +163,40 @@ export default {
       // 5. Start Interview Authorization — PAID ONLY (Always LIVE check with Firestore)
       if (path === "/v1/interview/start" && method === "POST") {
         const user = await requireAuthenticatedUser(request, env);
+        const limit = checkRateLimit(user.uid, "/v1/interview/start");
+        if (!limit.allowed && limit.response) {
+          trackApiUsage(user.uid, "/v1/interview/start", true, true, env, ctx);
+          const headers = new Headers(limit.response.headers);
+          setCorsHeaders(headers, request, env);
+          return new Response(limit.response.body, { status: limit.response.status, headers });
+        }
         const entitled = await requireActiveEntitlement(user, env, undefined, true);
-        const res = handleInterviewStart(entitled);
+        let deviceId: string | undefined;
+        try {
+          const body: any = await request.clone().json().catch(() => ({}));
+          deviceId = body?.deviceId;
+        } catch {}
+        const res = await handleInterviewStart(entitled, env, deviceId);
+        trackApiUsage(user.uid, "/v1/interview/start", false, false, env, ctx);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 5b. End Interview Session & Atomic Usage Deduction (Exempt from 15 RPM heavy limit) — Authenticated
+      if (path === "/v1/session/end" && method === "POST") {
+        const user = await requireAuthenticatedUser(request, env);
+        const res = await handleSessionEnd(request, user, env);
+        trackApiUsage(user.uid, "/v1/session/end", false, false, env, ctx);
+        const headers = new Headers(res.headers);
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 5c. Interview Session Heartbeat (Exempt from 15 RPM heavy limit) — Authenticated
+      if (path === "/v1/session/heartbeat" && method === "POST") {
+        const user = await requireAuthenticatedUser(request, env);
+        const res = await handleSessionHeartbeat(request, user, env);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
@@ -146,34 +205,44 @@ export default {
       // 6. Deepgram Temporary Token Generation — PAID ONLY (Always LIVE check with Firestore)
       if (path === "/v1/stt/token" && method === "POST") {
         const user = await requireAuthenticatedUser(request, env);
+        const limit = checkRateLimit(user.uid, "/v1/stt/token");
+        if (!limit.allowed && limit.response) {
+          trackApiUsage(user.uid, "/v1/stt/token", true, true, env, ctx);
+          const headers = new Headers(limit.response.headers);
+          setCorsHeaders(headers, request, env);
+          return new Response(limit.response.body, { status: limit.response.status, headers });
+        }
         const entitled = await requireActiveEntitlement(
           user,
           env,
           "Please upgrade your CrackFlow plan to start an interview.",
           true
         );
-        const res = await handleSttToken(entitled, env);
+        const res = await handleSttToken(entitled, env, request);
+        trackApiUsage(user.uid, "/v1/stt/token", false, false, env, ctx);
+        const headers = new Headers(res.headers);
+
+        setCorsHeaders(headers, request, env);
+        return new Response(res.body, { status: res.status, headers });
+      }
+
+      // 7. Gemini AI Completion Proxy — PAID ONLY with Active Session
+      if (path === "/v1/ai/complete" && method === "POST") {
+        const user = await requireAuthenticatedUser(request, env);
+        const limit = checkRateLimit(user.uid, "/v1/ai/complete");
+        if (!limit.allowed && limit.response) {
+          trackApiUsage(user.uid, "/v1/ai/complete", true, true, env, ctx);
+          const headers = new Headers(limit.response.headers);
+          setCorsHeaders(headers, request, env);
+          return new Response(limit.response.body, { status: limit.response.status, headers });
+        }
+        const res = await handleAiComplete(request, user, env);
+        trackApiUsage(user.uid, "/v1/ai/complete", false, false, env, ctx);
         const headers = new Headers(res.headers);
         setCorsHeaders(headers, request, env);
         return new Response(res.body, { status: res.status, headers });
       }
 
-      // 7. Gemini AI Completion Proxy — PAID ONLY
-      if (path === "/v1/ai/complete" && method === "POST") {
-        const user = await requireAuthenticatedUser(request, env);
-        const entitled = await requireActiveEntitlement(
-          user,
-          env,
-          "An active paid plan is required to use CrackFlow AI."
-        );
-        const res = await handleAiComplete(request, entitled, env);
-        const headers = new Headers(res.headers);
-        if (entitled.cacheStatus) {
-          headers.set("X-Entitlement-Cache", entitled.cacheStatus);
-        }
-        setCorsHeaders(headers, request, env);
-        return new Response(res.body, { status: res.status, headers });
-      }
 
       // 8. Billing: Create Checkout Session (Razorpay / Stripe) — Authenticated
       if (path === "/v1/billing/checkout" && method === "POST") {

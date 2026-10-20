@@ -3,8 +3,18 @@ export interface PlanFeature {
   included: boolean;
 }
 
+export type PlanId =
+  | "INTERVIEW_1H"
+  | "INTERVIEW_6H"
+  | "INTERVIEW_24H"
+  | "MONTHLY"
+  | "YEARLY"
+  | "starter"
+  | "pro"
+  | "lifetime";
+
 export interface Plan {
-  id: "starter" | "pro" | "lifetime";
+  id: PlanId;
   name: string;
   badge?: string;
   popular?: boolean;
@@ -12,7 +22,7 @@ export interface Plan {
   originalPrice?: number;
   currency: string;
   currencySymbol: string;
-  billingPeriod: "monthly" | "one_time";
+  billingPeriod: "one_time" | "monthly" | "yearly";
   billingPeriodLabel: string;
   description: string;
   features: PlanFeature[];
@@ -22,77 +32,133 @@ export interface Plan {
 
 export const PLANS: Plan[] = [
   {
-    id: "starter",
-    name: "Starter",
-    badge: "Essential",
-    price: 499,
-    originalPrice: 999,
+    id: "INTERVIEW_1H",
+    name: "1 Hour",
+    badge: "Quick Prep",
+    price: 199,
+    originalPrice: 499,
     currency: "INR",
     currencySymbol: "₹",
-    billingPeriod: "monthly",
-    billingPeriodLabel: "/month",
-    description: "Essential CrackFlow desktop AI interview assistant for individual job seekers.",
+    billingPeriod: "one_time",
+    billingPeriodLabel: "valid 30 days",
+    description: "1 hour of actual live AI interview assistance.",
     features: [
+      { text: "1 Hour of Live Interview Time", included: true },
+      { text: "234 AI Screen Solves Included", included: true },
       { text: "Full Windows Desktop App Access", included: true },
       { text: "Real-time Speech-to-Text Transcription", included: true },
       { text: "AI-Powered Live Answer Suggestions", included: true },
       { text: "Private Desktop Overlay (Screen-share Safe)", included: true },
-      { text: "Standard Context Loading (Resume & JD)", included: true },
-      { text: "Advanced Coding Mode & OCR", included: false },
-      { text: "Priority Cloud AI Processing", included: false },
+      { text: "30-Day Calendar Usage Window", included: true },
     ],
-    buttonText: "Get Starter",
+    buttonText: "Get 1 Hour",
     buttonVariant: "outline",
   },
   {
-    id: "pro",
-    name: "Pro",
+    id: "INTERVIEW_6H",
+    name: "6 Hours",
     badge: "Most Popular",
     popular: true,
+    price: 499,
+    originalPrice: 999,
+    currency: "INR",
+    currencySymbol: "₹",
+    billingPeriod: "one_time",
+    billingPeriodLabel: "valid 90 days",
+    description: "360 minutes of live interview usage for multiple rounds and assessments.",
+    features: [
+      { text: "360 Minutes of Live Interview Time", included: true },
+      { text: "587 AI Screen Solves Included", included: true },
+      { text: "Full Windows Desktop App Access", included: true },
+      { text: "Ultra-low Latency Speech & AI", included: true },
+      { text: "Coding & System Design Modes", included: true },
+      { text: "Private Desktop Overlay (Screen-share Safe)", included: true },
+      { text: "90-Day Calendar Usage Window", included: true },
+    ],
+    buttonText: "Get 6 Hours",
+    buttonVariant: "gold",
+  },
+  {
+    id: "INTERVIEW_24H",
+    name: "24 Hours / Whole Day",
+    badge: "Best Value",
+    price: 999,
+    originalPrice: 2499,
+    currency: "INR",
+    currencySymbol: "₹",
+    billingPeriod: "one_time",
+    billingPeriodLabel: "valid 180 days",
+    description: "24 full hours (1,440 minutes) of actual interview usage across 180 days.",
+    features: [
+      { text: "24 Full Hours of Actual Usage", included: true },
+      { text: "1,175 AI Screen Solves Included", included: true },
+      { text: "Use across multiple weeks / months", included: true },
+      { text: "Full Windows Desktop App Access", included: true },
+      { text: "All Interview Modes (DSA, System Design, HR)", included: true },
+      { text: "Ultra-low Latency Cloud AI", included: true },
+      { text: "180-Day Calendar Usage Window", included: true },
+    ],
+    buttonText: "Get 24 Hours",
+    buttonVariant: "default",
+  },
+  {
+    id: "MONTHLY",
+    name: "Monthly",
+    badge: "Unlimited",
     price: 999,
     originalPrice: 1999,
     currency: "INR",
     currencySymbol: "₹",
     billingPeriod: "monthly",
     billingPeriodLabel: "/month",
-    description: "Full-power AI interview copilot with code generation, OCR, and ultra-low latency.",
+    description: "Unlimited interview usage for active job hunting season.",
     features: [
+      { text: "Unlimited Interview Usage", included: true },
+      { text: "Unlimited AI Screen Solves (Fair Use applies)", included: true },
       { text: "Full Windows Desktop App Access", included: true },
-      { text: "Real-time Speech-to-Text Transcription", included: true },
-      { text: "Ultra-low Latency AI Completions", included: true },
-      { text: "Coding Mode (DSA, System Design, LeetCode)", included: true },
-      { text: "On-demand Screen OCR & Visual Analysis", included: true },
-      { text: "Unlimited Resume & Job Context Files", included: true },
-      { text: "Priority Support & Regular Updates", included: true },
+      { text: "Ultra-low Latency AI Answers", included: true },
+      { text: "Continuous Regular Updates", included: true },
+      { text: "Priority Support & Low Latency Cloud", included: true },
     ],
-    buttonText: "Upgrade to Pro",
-    buttonVariant: "gold",
+    buttonText: "Get Unlimited Monthly",
+    buttonVariant: "outline",
   },
   {
-    id: "lifetime",
-    name: "Lifetime Pass",
-    badge: "Best Value",
+    id: "YEARLY",
+    name: "Yearly Pass",
+    badge: "Unlimited",
     price: 4999,
     originalPrice: 9999,
     currency: "INR",
     currencySymbol: "₹",
-    billingPeriod: "one_time",
-    billingPeriodLabel: "one-time payment",
-    description: "Pay once for lifetime access to CrackFlow desktop service with no recurring subscription fees.",
+    billingPeriod: "yearly",
+    billingPeriodLabel: "/year",
+    description: "Unlimited annual access with maximum savings for senior career switches.",
     features: [
-      { text: "All Pro Features Included", included: true },
-      { text: "No Recurring Monthly Fees", included: true },
+      { text: "Unlimited Interview Usage for 1 Year", included: true },
+      { text: "Unlimited AI Screen Solves (Fair Use applies)", included: true },
       { text: "Full Windows Desktop App Access", included: true },
-      { text: "Speech-to-Text & AI Generation", included: true },
-      { text: "Coding & Behavioral Interview Modes", included: true },
-      { text: "Lifetime Updates for Current Service", included: true },
-      { text: "Priority Customer Support", included: true },
+      { text: "All Interview Modes & Updates", included: true },
+      { text: "Ultra-low Latency Cloud Priority", included: true },
+      { text: "Priority 24/7 Support", included: true },
     ],
-    buttonText: "Get Lifetime Access",
+    buttonText: "Get Unlimited Yearly",
     buttonVariant: "default",
   },
 ];
 
+// Aliases for backward compatibility
+const ALIASES: Record<string, string> = {
+  starter: "INTERVIEW_1H",
+  pro: "MONTHLY",
+  lifetime: "YEARLY",
+};
+
 export function getPlanById(planId: string): Plan | undefined {
-  return PLANS.find((p) => p.id === planId);
+  const direct = PLANS.find((p) => p.id === planId);
+  if (direct) return direct;
+  const aliasedId = ALIASES[planId];
+  if (aliasedId) return PLANS.find((p) => p.id === aliasedId);
+  return undefined;
 }
+

@@ -50,7 +50,7 @@ interface AuthContextType {
   resetPassword: typeof sendPasswordReset;
   refreshProfile: () => Promise<void>;
   refreshBackend: () => Promise<void>;
-  selectPlan: (planId: "starter" | "pro" | "lifetime") => Promise<PlanSelectResult>;
+  selectPlan: (planId: string) => Promise<PlanSelectResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const selectPlan = async (planId: "starter" | "pro" | "lifetime"): Promise<PlanSelectResult> => {
+  const selectPlan = async (planId: string): Promise<PlanSelectResult> => {
     if (!user) {
       throw new Error("User must be authenticated to select a plan.");
     }
