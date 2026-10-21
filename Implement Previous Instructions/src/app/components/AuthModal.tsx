@@ -421,6 +421,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="password"
                   required
                   autoFocus
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -518,6 +519,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="password"
                     required
+                    autoComplete={tab === "signup" ? "new-password" : "current-password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

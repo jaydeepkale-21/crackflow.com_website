@@ -1,5 +1,13 @@
 import { Env, AuthenticatedUser } from "../types";
 import { HttpError } from "../middleware/auth";
+import {
+  saveExchangeCodeInFirestore,
+  getExchangeCodeFromFirestore,
+  deleteExchangeCodeFromFirestore,
+  saveExchangeSessionInFirestore,
+  getExchangeSessionFromFirestore,
+  deleteExchangeSessionFromFirestore,
+} from "../lib/firestore";
 
 interface CodeEntry {
   uid: string;
@@ -16,7 +24,7 @@ interface SessionEntry {
   claimed: boolean;
 }
 
-// In-memory single-use exchange stores (60s validity)
+// In-memory single-use exchange stores (L1 edge cache)
 const exchangeCodes = new Map<string, CodeEntry>();
 const exchangeSessions = new Map<string, SessionEntry>();
 
@@ -104,12 +112,13 @@ export async function createCustomToken(
 
 /**
  * POST /v1/auth/exchange/create
- * Authenticated website calls this with user's Firebase token to issue a 60s exchange code.
+ * Authenticated website calls this with user's Firebase token to issue a 10-minute exchange code.
+ * Persisted in Firestore so any edge isolate or cold-started Worker instance can claim or poll it.
  */
 export async function handleCreateExchangeCode(
   request: Request,
   user: AuthenticatedUser,
-  _env: Env
+  env: Env
 ): Promise<Response> {
   cleanExpired();
 
@@ -126,30 +135,50 @@ export async function handleCreateExchangeCode(
   crypto.getRandomValues(randomBytes);
   const code = "cf_" + Array.from(randomBytes, (b) => b.toString(36).padStart(2, "0")).join("").substring(0, 16);
 
-  const expiresAt = Date.now() + 60 * 1000; // 60 seconds
+  // 10 minutes validity (600s) so users have plenty of time
+  const expiresIn = 600;
+  const expiresAt = Date.now() + expiresIn * 1000;
 
-  exchangeCodes.set(code, {
+  const codeEntry: CodeEntry = {
     uid: user.decoded.uid,
     email: user.decoded.email,
     expiresAt,
     claimed: false,
-  });
+  };
+
+  exchangeCodes.set(code, codeEntry);
+
+  // Persist code in Firestore (durable L2 store)
+  try {
+    await saveExchangeCodeInFirestore(code, codeEntry, env);
+  } catch (err: any) {
+    console.warn("[Exchange] Warning persisting code to Firestore:", err?.message || err);
+  }
 
   if (session && typeof session === "string" && session.trim().length > 0) {
-    exchangeSessions.set(session.trim(), {
+    const cleanSession = session.trim();
+    const sessionEntry: SessionEntry = {
       uid: user.decoded.uid,
       email: user.decoded.email,
       code,
       expiresAt,
       claimed: false,
-    });
+    };
+    exchangeSessions.set(cleanSession, sessionEntry);
+
+    // Persist session in Firestore (durable L2 store)
+    try {
+      await saveExchangeSessionInFirestore(cleanSession, sessionEntry, env);
+    } catch (err: any) {
+      console.warn("[Exchange] Warning persisting session to Firestore:", err?.message || err);
+    }
   }
 
   return new Response(
     JSON.stringify({
       success: true,
       code,
-      expiresIn: 60,
+      expiresIn,
       uid: user.decoded.uid,
     }),
     {
@@ -161,7 +190,8 @@ export async function handleCreateExchangeCode(
 
 /**
  * POST /v1/auth/exchange/claim
- * Desktop claims the 60s single-use exchange code to obtain a Firebase Custom Token for the SAME UID.
+ * Desktop claims the single-use exchange code to obtain a Firebase Custom Token for the SAME UID.
+ * Checks L1 in-memory map first, then Firestore for cross-isolate durability.
  */
 export async function handleClaimExchangeCode(
   request: Request,
@@ -181,9 +211,26 @@ export async function handleClaimExchangeCode(
     throw new HttpError(400, "INVALID_CODE", "An authorization code must be provided");
   }
 
-  const entry = exchangeCodes.get(code.trim());
+  const cleanCode = code.trim();
+  let entry = exchangeCodes.get(cleanCode);
+
+  // If not found in local memory, check persistent Firestore
+  if (!entry) {
+    try {
+      const fsEntry = await getExchangeCodeFromFirestore(cleanCode, env);
+      if (fsEntry) {
+        entry = fsEntry;
+      }
+    } catch (err: any) {
+      console.warn("[Exchange] Error fetching code from Firestore:", err?.message || err);
+    }
+  }
+
   if (!entry || entry.expiresAt < Date.now()) {
-    if (entry) exchangeCodes.delete(code.trim());
+    if (entry) exchangeCodes.delete(cleanCode);
+    try {
+      await deleteExchangeCodeFromFirestore(cleanCode, env);
+    } catch {}
     throw new HttpError(400, "EXPIRED_CODE", "The authorization code is invalid or has expired.");
   }
 
@@ -192,7 +239,10 @@ export async function handleClaimExchangeCode(
   }
 
   entry.claimed = true;
-  exchangeCodes.delete(code.trim());
+  exchangeCodes.delete(cleanCode);
+  try {
+    await deleteExchangeCodeFromFirestore(cleanCode, env);
+  } catch {}
 
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     throw new HttpError(500, "CONFIG_ERROR", "Firebase Service Account is not configured in Worker");
@@ -220,7 +270,8 @@ export async function handleClaimExchangeCode(
 
 /**
  * GET /v1/auth/exchange/poll?session=...
- * Desktop can poll this while waiting for browser login.
+ * Desktop polls this while waiting for browser login.
+ * Checks L1 in-memory map first, then Firestore for cross-isolate durability.
  */
 export async function handlePollExchangeSession(
   request: Request,
@@ -235,9 +286,26 @@ export async function handlePollExchangeSession(
     throw new HttpError(400, "INVALID_SESSION", "Session parameter is required");
   }
 
-  const entry = exchangeSessions.get(session.trim());
+  const cleanSession = session.trim();
+  let entry = exchangeSessions.get(cleanSession);
+
+  // If not in local memory, check persistent Firestore
+  if (!entry) {
+    try {
+      const fsEntry = await getExchangeSessionFromFirestore(cleanSession, env);
+      if (fsEntry) {
+        entry = fsEntry;
+      }
+    } catch (err: any) {
+      console.warn("[Exchange] Error fetching session from Firestore:", err?.message || err);
+    }
+  }
+
   if (!entry || entry.expiresAt < Date.now()) {
-    if (entry) exchangeSessions.delete(session.trim());
+    if (entry) exchangeSessions.delete(cleanSession);
+    try {
+      await deleteExchangeSessionFromFirestore(cleanSession, env);
+    } catch {}
     return new Response(
       JSON.stringify({ success: false, pending: true, expired: true }),
       { status: 200, headers: { "Content-Type": "application/json" } }
@@ -259,7 +327,10 @@ export async function handlePollExchangeSession(
   }
 
   entry.claimed = true;
-  exchangeSessions.delete(session.trim());
+  exchangeSessions.delete(cleanSession);
+  try {
+    await deleteExchangeSessionFromFirestore(cleanSession, env);
+  } catch {}
 
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     throw new HttpError(500, "CONFIG_ERROR", "Firebase Service Account is not configured in Worker");
@@ -284,3 +355,4 @@ export async function handlePollExchangeSession(
     }
   );
 }
+

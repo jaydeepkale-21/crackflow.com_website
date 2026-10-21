@@ -75,7 +75,7 @@ function base64UrlEncode(data: Uint8Array | string): string {
 /**
  * Wraps fetch with automatic retry on transient socket drops or 503/429 responses.
  */
-async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Promise<Response> {
+export async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Promise<Response> {
   let attempt = 0;
   while (true) {
     try {
@@ -231,7 +231,7 @@ export function toFirestoreValue(val: any): any {
 /**
  * Gets a valid Authorization header for Firestore REST API writes (Service Account required).
  */
-async function getAdminAuthHeader(env: Env): Promise<string> {
+export async function getAdminAuthHeader(env: Env): Promise<string> {
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is required for Firestore write operations.");
   }
@@ -1006,5 +1006,165 @@ export async function refundScreenQuota(
     console.error(`[Firestore] refundScreenQuota failed (${response.status}): ${errText}`);
   }
 }
+
+/**
+ * Persists an authorization exchange code into Firestore collection exchange_codes/{code}.
+ */
+export async function saveExchangeCodeInFirestore(
+  code: string,
+  entry: { uid: string; email?: string; expiresAt: number; claimed: boolean },
+  env: Env
+): Promise<void> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_codes?documentId=${encodeURIComponent(
+    code
+  )}`;
+
+  await fetchWithRetry(url, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fields: {
+        uid: toFirestoreValue(entry.uid),
+        email: toFirestoreValue(entry.email || ""),
+        expiresAt: toFirestoreValue(entry.expiresAt),
+        claimed: toFirestoreValue(entry.claimed),
+      },
+    }),
+  });
+}
+
+/**
+ * Retrieves an authorization exchange code from Firestore collection exchange_codes/{code}.
+ */
+export async function getExchangeCodeFromFirestore(
+  code: string,
+  env: Env
+): Promise<{ uid: string; email?: string; expiresAt: number; claimed: boolean } | null> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_codes/${encodeURIComponent(
+    code
+  )}`;
+
+  const res = await fetchWithRetry(url, {
+    method: "GET",
+    headers: { Authorization: authHeader },
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    console.warn(`[Firestore] getExchangeCodeFromFirestore failed (${res.status})`);
+    return null;
+  }
+
+  const doc = await res.json();
+  const data = parseFirestoreDocument(doc);
+  return data as { uid: string; email?: string; expiresAt: number; claimed: boolean };
+}
+
+/**
+ * Deletes an authorization exchange code from Firestore collection exchange_codes/{code}.
+ */
+export async function deleteExchangeCodeFromFirestore(
+  code: string,
+  env: Env
+): Promise<void> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_codes/${encodeURIComponent(
+    code
+  )}`;
+
+  await fetchWithRetry(url, {
+    method: "DELETE",
+    headers: { Authorization: authHeader },
+  });
+}
+
+/**
+ * Persists a desktop auth session bridge into Firestore collection exchange_sessions/{session}.
+ */
+export async function saveExchangeSessionInFirestore(
+  session: string,
+  entry: { uid?: string; email?: string; code?: string; expiresAt: number; claimed: boolean },
+  env: Env
+): Promise<void> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_sessions?documentId=${encodeURIComponent(
+    session
+  )}`;
+
+  await fetchWithRetry(url, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fields: {
+        uid: toFirestoreValue(entry.uid || ""),
+        email: toFirestoreValue(entry.email || ""),
+        code: toFirestoreValue(entry.code || ""),
+        expiresAt: toFirestoreValue(entry.expiresAt),
+        claimed: toFirestoreValue(entry.claimed),
+      },
+    }),
+  });
+}
+
+/**
+ * Retrieves a desktop auth session bridge from Firestore collection exchange_sessions/{session}.
+ */
+export async function getExchangeSessionFromFirestore(
+  session: string,
+  env: Env
+): Promise<{ uid?: string; email?: string; code?: string; expiresAt: number; claimed: boolean } | null> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_sessions/${encodeURIComponent(
+    session
+  )}`;
+
+  const res = await fetchWithRetry(url, {
+    method: "GET",
+    headers: { Authorization: authHeader },
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    console.warn(`[Firestore] getExchangeSessionFromFirestore failed (${res.status})`);
+    return null;
+  }
+
+  const doc = await res.json();
+  const data = parseFirestoreDocument(doc);
+  return data as { uid?: string; email?: string; code?: string; expiresAt: number; claimed: boolean };
+}
+
+/**
+ * Deletes a desktop auth session bridge from Firestore collection exchange_sessions/{session}.
+ */
+export async function deleteExchangeSessionFromFirestore(
+  session: string,
+  env: Env
+): Promise<void> {
+  const projectId = env.FIREBASE_PROJECT_ID || "crackflow";
+  const authHeader = await getAdminAuthHeader(env);
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/exchange_sessions/${encodeURIComponent(
+    session
+  )}`;
+
+  await fetchWithRetry(url, {
+    method: "DELETE",
+    headers: { Authorization: authHeader },
+  });
+}
+
 
 
