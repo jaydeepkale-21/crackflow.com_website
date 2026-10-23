@@ -45,9 +45,11 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
   const cleanPem = pem
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\\r/g, "")
     .replace(/\\n/g, "")
-    .replace(/\r?\n/g, "")
-    .replace(/\s+/g, "");
+    .replace(/\r/g, "")
+    .replace(/\n/g, "")
+    .replace(/[^A-Za-z0-9+/=]/g, "");
 
   const binary = atob(cleanPem);
   const bytes = new Uint8Array(binary.length);
@@ -98,6 +100,44 @@ export async function fetchWithRetry(url: string, init?: RequestInit, retries = 
 }
 
 /**
+ * Safely parses the Google Service Account JSON, stripping surrounding single/double quotes
+ * and repairing any bad escape sequences or unescaped control characters.
+ */
+export function parseServiceAccount(serviceAccountJson: string): any {
+  let clean = serviceAccountJson.trim();
+  if (clean.startsWith("'") && clean.endsWith("'")) {
+    clean = clean.slice(1, -1).trim();
+  }
+
+  // 1. Try standard JSON.parse first
+  try {
+    return JSON.parse(clean);
+  } catch (e1: any) {
+    // 2. Repair bad escape characters (e.g. invalid backslashes in PEM)
+    try {
+      const sanitized = clean
+        .replace(/\r?\n/g, "\\n")
+        .replace(/\\([^"\\\/bfnrtu])/g, "$1");
+      return JSON.parse(sanitized);
+    } catch (e2: any) {
+      // 3. Fallback: extract required fields via regex if JSON is still malformed
+      const clientEmailMatch = clean.match(/"client_email"\s*:\s*"([^"]+)"/);
+      const privateKeyMatch = clean.match(/"private_key"\s*:\s*"([\s\S]*?)(?:","|"[\r\n]+\s*"|"\}\s*$)/);
+      const projectIdMatch = clean.match(/"project_id"\s*:\s*"([^"]+)"/);
+
+      if (clientEmailMatch && privateKeyMatch) {
+        return {
+          client_email: clientEmailMatch[1],
+          private_key: privateKeyMatch[1].replace(/\\n/g, "\n"),
+          project_id: projectIdMatch ? projectIdMatch[1] : "crackflow",
+        };
+      }
+      throw new Error(`Failed to parse Service Account: ${e1?.message || e1}`);
+    }
+  }
+}
+
+/**
  * Generates an OAuth 2.0 Access Token using a Google Service Account key.
  * Caches token for 50 minutes (validity is 60 minutes).
  */
@@ -107,7 +147,7 @@ async function getServiceAccountAccessToken(serviceAccountJson: string): Promise
     return cachedSaToken.token;
   }
 
-  const sa = JSON.parse(serviceAccountJson);
+  const sa = parseServiceAccount(serviceAccountJson);
   const nowInSec = Math.floor(now / 1000);
 
   const header = { alg: "RS256", typ: "JWT" };

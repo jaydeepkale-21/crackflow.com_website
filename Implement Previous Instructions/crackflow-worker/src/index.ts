@@ -315,7 +315,7 @@ export default {
       return jsonResponse(
         {
           error: "INTERNAL_SERVER_ERROR",
-          message: "CrackFlow service is temporarily unavailable. Please try again.",
+          message: err?.message || "CrackFlow service is temporarily unavailable. Please try again.",
         },
         500,
         request,

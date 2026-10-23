@@ -7,6 +7,7 @@ import {
   saveExchangeSessionInFirestore,
   getExchangeSessionFromFirestore,
   deleteExchangeSessionFromFirestore,
+  parseServiceAccount,
 } from "../lib/firestore";
 
 interface CodeEntry {
@@ -51,9 +52,11 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
   const cleanPem = pem
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\\r/g, "")
     .replace(/\\n/g, "")
-    .replace(/\r?\n/g, "")
-    .replace(/\s+/g, "");
+    .replace(/\r/g, "")
+    .replace(/\n/g, "")
+    .replace(/[^A-Za-z0-9+/=]/g, "");
 
   const binary = atob(cleanPem);
   const bytes = new Uint8Array(binary.length);
@@ -82,7 +85,7 @@ export async function createCustomToken(
   uid: string,
   claims?: Record<string, any>
 ): Promise<string> {
-  const sa = JSON.parse(serviceAccountJson);
+  const sa = parseServiceAccount(serviceAccountJson);
   const nowInSec = Math.floor(Date.now() / 1000);
 
   const header = { alg: "RS256", typ: "JWT" };
@@ -301,13 +304,22 @@ export async function handlePollExchangeSession(
     }
   }
 
-  if (!entry || entry.expiresAt < Date.now()) {
-    if (entry) exchangeSessions.delete(cleanSession);
+  // 1. If not found, session is simply waiting for user to complete login in browser
+  if (!entry) {
+    return new Response(
+      JSON.stringify({ success: false, pending: true, expired: false }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // 2. If found but expired (past 10 minutes)
+  if (entry.expiresAt < Date.now()) {
+    exchangeSessions.delete(cleanSession);
     try {
       await deleteExchangeSessionFromFirestore(cleanSession, env);
     } catch {}
     return new Response(
-      JSON.stringify({ success: false, pending: true, expired: true }),
+      JSON.stringify({ success: false, pending: false, expired: true }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }

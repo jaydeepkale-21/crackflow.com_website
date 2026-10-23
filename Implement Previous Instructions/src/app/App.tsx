@@ -1766,11 +1766,28 @@ export default function App() {
   const [isDesktopAuthFlow, setIsDesktopAuthFlow] = useState(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(window.location.search);
-    return params.get("desktop_auth") === "1";
+    const hasParam = params.get("desktop_auth") === "1";
+    if (hasParam) {
+      try {
+        sessionStorage.setItem("crackflow_desktop_auth", "1");
+        const s = params.get("session");
+        if (s) sessionStorage.setItem("crackflow_desktop_session", s);
+      } catch {}
+      return true;
+    }
+    try {
+      return sessionStorage.getItem("crackflow_desktop_auth") === "1";
+    } catch {
+      return false;
+    }
   });
 
   const closeDesktopAuthModal = () => {
     setIsDesktopAuthFlow(false);
+    try {
+      sessionStorage.removeItem("crackflow_desktop_auth");
+      sessionStorage.removeItem("crackflow_desktop_session");
+    } catch {}
     if (typeof window !== "undefined" && window.history.replaceState) {
       const url = new URL(window.location.href);
       url.searchParams.delete("desktop_auth");
@@ -1784,7 +1801,13 @@ export default function App() {
 
   const [desktopSessionId] = useState(() => {
     if (typeof window === "undefined") return undefined;
-    return new URLSearchParams(window.location.search).get("session") || undefined;
+    const urlSession = new URLSearchParams(window.location.search).get("session");
+    if (urlSession) return urlSession;
+    try {
+      return sessionStorage.getItem("crackflow_desktop_session") || undefined;
+    } catch {
+      return undefined;
+    }
   });
   const [desktopExchangeCode, setDesktopExchangeCode] = useState<string | null>(null);
   const [desktopAuthError, setDesktopAuthError] = useState<string | null>(null);
