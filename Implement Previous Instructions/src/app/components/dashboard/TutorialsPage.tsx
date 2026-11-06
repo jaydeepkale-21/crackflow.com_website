@@ -83,9 +83,9 @@ export const TutorialsPage: React.FC<TutorialsPageProps> = ({ onOpenVideo }) => 
           >
             <div className="video-brand">
               <img
-                src="/assets/brand/crackflow-logo.png"
+                src="/assets/brand/crackflow-logo.webp"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.png";
+                  (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.webp";
                 }}
                 alt="CrackFlow"
               />
@@ -139,9 +139,9 @@ export const TutorialsPage: React.FC<TutorialsPageProps> = ({ onOpenVideo }) => 
               >
                 <div className="video-brand">
                   <img
-                    src="/assets/brand/crackflow-logo.png"
+                    src="/assets/brand/crackflow-logo.webp"
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.png";
+                      (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.webp";
                     }}
                     alt=""
                   />

@@ -185,11 +185,11 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onSelectPlan }) => {
       <header className="plans-header">
         <div className="plans-brand">
           <img
-            src="/assets/brand/crackflow-logo.png"
+            src="/assets/brand/crackflow-logo.webp"
             alt="CrackFlow"
             className="plans-brand-logo"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.png";
+              (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.webp";
             }}
           />
         </div>

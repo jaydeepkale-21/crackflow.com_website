@@ -56,7 +56,7 @@ describe("Unit: Sidebar Navigation & Structure", () => {
     // Check logo
     const logoImg = screen.getAllByAltText("CrackFlow")[0];
     expect(logoImg).toBeInTheDocument();
-    expect(logoImg.getAttribute("src")).toContain("crackflow-logo.png");
+    expect(logoImg.getAttribute("src")).toMatch(/crackflow-logo\.(webp|png)/);
 
     // Check nav links in exact order:
     // 1. Getting Started, 2. Resume, 3. Plans & Billing, 4. How to Use & Setup, 5. Profile

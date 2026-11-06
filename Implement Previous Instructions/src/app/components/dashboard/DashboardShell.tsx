@@ -178,9 +178,9 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 
           <img
             className="brand-logo"
-            src="/assets/brand/crackflow-logo.png"
+            src="/assets/brand/crackflow-logo.webp"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.png";
+              (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.webp";
             }}
             alt="CrackFlow"
             onClick={onReturnToHome}

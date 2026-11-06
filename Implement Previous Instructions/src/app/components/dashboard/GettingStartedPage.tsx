@@ -87,10 +87,10 @@ export const GettingStartedPage: React.FC<GettingStartedPageProps> = ({
         </div>
         <div className="product-illustration">
           <img
-            src="/assets/images/crackflow-interview-hero.png"
+            src="/assets/images/crackflow-interview-hero.webp"
             onError={(e) => {
               // Fallback to root alias if assets path is missing
-              (e.currentTarget as HTMLImageElement).src = "/crackflow-interview-hero.png";
+              (e.currentTarget as HTMLImageElement).src = "/crackflow-interview-hero.webp";
             }}
             alt="CrackFlow assisting alongside a live Google Meet interview"
           />
@@ -176,9 +176,9 @@ export const GettingStartedPage: React.FC<GettingStartedPageProps> = ({
           >
             <div className="video-brand">
               <img
-                src="/assets/brand/crackflow-logo.png"
+                src="/assets/brand/crackflow-logo.webp"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.png";
+                  (e.currentTarget as HTMLImageElement).src = "/crackflow-logo.webp";
                 }}
                 alt="CrackFlow"
               />
