@@ -35,12 +35,14 @@ export const DesktopLaunchModal: React.FC<DesktopLaunchModalProps> = ({
     setDownloading(true);
     try {
       const res = await getInstallerDownload();
-      if (res.success && res.data?.downloadUrl) {
-        window.open(res.data.downloadUrl, "_blank", "noopener,noreferrer");
-      }
+      const rawUrl = res.data?.downloadUrl;
+      const targetUrl = (rawUrl && !rawUrl.includes("storage.googleapis.com"))
+        ? rawUrl
+        : "/downloads/CrackFlow-Setup.exe";
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
     } catch {
       // Fallback
-      window.open("/crackflow-setup.exe", "_blank");
+      window.open("/downloads/CrackFlow-Setup.exe", "_blank");
     } finally {
       setDownloading(false);
     }
