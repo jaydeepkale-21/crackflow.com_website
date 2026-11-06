@@ -11,9 +11,9 @@ export function handleInstallerDownload(
 ): Response {
   return new Response(
     JSON.stringify({
-      downloadUrl: "https://storage.googleapis.com/crackflow-releases/CrackFlow-Setup-2.4.1.exe",
-      version: "v2.4.1",
-      fileName: "CrackFlow-Setup-2.4.1.exe",
+      downloadUrl: "/downloads/CrackFlow-Setup.exe",
+      version: "v0.1.0",
+      fileName: "CrackFlow-Setup.exe",
       expiresInSeconds: 300,
     }),
     {
@@ -26,10 +26,10 @@ export function handleInstallerDownload(
 export function handleVersion(): Response {
   return new Response(
     JSON.stringify({
-      version: "v2.4.1",
-      releaseDate: "2026-03-01",
-      downloadUrl: null,
-      notes: "CrackFlow Desktop Production Release",
+      version: "v0.1.0",
+      releaseDate: "2026-11-06",
+      downloadUrl: "/downloads/CrackFlow-Setup.exe",
+      notes: "CrackFlow Desktop Production Release v0.1.0",
     }),
     {
       status: 200,

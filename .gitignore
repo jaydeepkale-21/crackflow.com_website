@@ -23,6 +23,8 @@ build/
 
 # Large ZIP archives & temp files
 *.zip
+!**/public/downloads/*.zip
+!**/public/*.zip
 ChatGPT Image*.png
 *test api.txt
 razepay test api.txt
