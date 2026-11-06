@@ -224,7 +224,14 @@ export async function handleAiComplete(
   }
 
   // Use requested model or default to ultra-low latency gemini-3.1-flash-lite
-  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "gemini-3.1-flash-lite";
+  const requestedModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "gemini-3.1-flash-lite";
+  const modelCandidates = [
+    requestedModel,
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
+    "gemini-3.8-flash",
+  ].filter((m, idx, arr) => arr.indexOf(m) === idx);
+
   const stream = body.stream === true;
   const geminiPayload = body.payload || {
     contents: body.contents,
@@ -241,37 +248,66 @@ export async function handleAiComplete(
     },
   };
 
-  const endpoint = stream
-    ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${geminiKey}`
-    : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+  let geminiRes: Response | null = null;
+  let lastErrorText: string = "";
+  let lastStatus: number = 500;
 
-  let geminiRes: Response;
-  try {
-    geminiRes = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(geminiPayload),
-    });
-  } catch (err: any) {
-    console.error("[Worker AI] Unexpected error calling Gemini:", err);
-    if (screenReservation && idempotencyKey && !screenReservation.alreadyReserved) {
-      await refundScreenQuota(user.uid, idempotencyKey, "fetch_failed", env);
-      updateCachedEntitlementScreenSolves(user.uid, screenReservation.remainingSolves + 1);
+  for (const candidateModel of modelCandidates) {
+    const endpoint = stream
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:streamGenerateContent?alt=sse&key=${geminiKey}`
+      : `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${geminiKey}`;
+
+    // Up to 2 attempts per candidate model (in case of momentary connection / location hiccup)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(geminiPayload),
+        });
+
+        if (res.ok) {
+          geminiRes = res;
+          break;
+        }
+
+        lastStatus = res.status;
+        lastErrorText = await res.text().catch(() => "");
+        console.warn(`[Worker AI] Model ${candidateModel} (attempt ${attempt}) returned ${res.status}: ${lastErrorText}`);
+
+        // If it's an unrecoverable auth error with the key itself, abort immediately
+        if (res.status === 401 || (res.status === 403 && lastErrorText.includes("API_KEY_INVALID"))) {
+          break;
+        }
+
+        // Wait brief delay before retry
+        await new Promise((r) => setTimeout(r, 200 * attempt));
+      } catch (err: any) {
+        console.warn(`[Worker AI] Network error fetching ${candidateModel} (attempt ${attempt}):`, err);
+        await new Promise((r) => setTimeout(r, 200 * attempt));
+      }
     }
-    throw new HttpError(500, "INTERNAL_ERROR", "Failed to connect to AI provider.");
+
+    if (geminiRes && geminiRes.ok) {
+      break;
+    }
+
+    // Stop trying models if key itself is invalid
+    if (lastStatus === 401 || (lastStatus === 403 && lastErrorText.includes("API_KEY_INVALID"))) {
+      break;
+    }
   }
 
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text().catch(() => "");
-    console.error("[Worker AI] Gemini API returned error:", geminiRes.status, errText);
+  if (!geminiRes || !geminiRes.ok) {
+    console.error("[Worker AI] All candidate models failed:", lastStatus, lastErrorText);
     if (screenReservation && idempotencyKey && !screenReservation.alreadyReserved) {
-      await refundScreenQuota(user.uid, idempotencyKey, `gemini_error_${geminiRes.status}`, env);
+      await refundScreenQuota(user.uid, idempotencyKey, `gemini_error_${lastStatus}`, env);
       updateCachedEntitlementScreenSolves(user.uid, screenReservation.remainingSolves + 1);
     }
-    return new Response(errText, {
-      status: geminiRes.status,
+    return new Response(lastErrorText || JSON.stringify({ error: { message: "AI provider service temporarily unavailable." } }), {
+      status: lastStatus,
       headers: { "Content-Type": "application/json" },
     });
   }

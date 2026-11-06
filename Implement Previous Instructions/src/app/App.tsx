@@ -1645,6 +1645,7 @@ interface LandingPageContentProps {
   view: "landing" | "dashboard";
   checkoutStatus: "success" | "cancel" | null;
   isAuthenticated: boolean;
+  loading: boolean;
   handleSelectPlan: (planId: "starter" | "pro" | "lifetime") => Promise<void>;
   loadingPlanId: string | null;
   demoNotice: string | null;
@@ -1659,6 +1660,7 @@ function LandingPageContent({
   view,
   checkoutStatus,
   isAuthenticated,
+  loading,
   handleSelectPlan,
   loadingPlanId,
   demoNotice,
@@ -1672,20 +1674,22 @@ function LandingPageContent({
         scrollBehavior: "smooth",
       }}
     >
-      <Navbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onOpenAuth={handleOpenAuth}
-        onOpenDashboard={() => {
-          clearCheckoutParams();
-          setView("dashboard");
-        }}
-        onGoHome={() => {
-          clearCheckoutParams();
-          setView("landing");
-        }}
-        view={view}
-      />
+      {view !== "dashboard" && (
+        <Navbar
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          onOpenAuth={handleOpenAuth}
+          onOpenDashboard={() => {
+            clearCheckoutParams();
+            setView("dashboard");
+          }}
+          onGoHome={() => {
+            clearCheckoutParams();
+            setView("landing");
+          }}
+          view={view}
+        />
+      )}
 
       {checkoutStatus === "success" ? (
         <CheckoutSuccess
@@ -1712,16 +1716,39 @@ function LandingPageContent({
             setView("dashboard");
           }}
         />
-      ) : view === "dashboard" && isAuthenticated ? (
-        <Dashboard
-          onReturnToHome={() => setView("landing")}
-          onOpenPricing={() => {
-            setView("landing");
-            setTimeout(() => {
-              document.querySelector("#pricing")?.scrollIntoView({ behavior: "smooth" });
-            }, 100);
-          }}
-        />
+      ) : view === "dashboard" ? (
+        loading ? (
+          <div className="min-h-screen bg-[#FAFAF8] flex flex-col items-center justify-center text-neutral-800 gap-3 pt-24 font-['DM_Sans',sans-serif]">
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+            <p className="text-sm text-neutral-500 font-medium">Loading your dashboard...</p>
+          </div>
+        ) : isAuthenticated ? (
+          <Dashboard
+            onReturnToHome={() => setView("landing")}
+            onOpenPricing={() => {
+              setView("landing");
+              setTimeout(() => {
+                document.querySelector("#pricing")?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            }}
+          />
+        ) : (
+          <div className="min-h-screen bg-[#FAFAF8] flex flex-col items-center justify-center text-neutral-800 gap-4 pt-24 px-4 text-center font-['DM_Sans',sans-serif]">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 mb-2">
+              <Zap className="w-8 h-8 text-amber-500" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Please log in to view your dashboard</h2>
+            <p className="text-sm text-neutral-500 max-w-md">
+              Sign in with your CrackFlow account to access your interview workspace, resume context, and desktop application.
+            </p>
+            <button
+              onClick={() => handleOpenAuth("login")}
+              className="px-6 py-2.5 rounded-xl font-bold text-sm bg-amber-500 hover:bg-amber-400 text-black cursor-pointer transition-all shadow-lg shadow-amber-500/20"
+            >
+              Log In to Dashboard
+            </button>
+          </div>
+        )
       ) : (
         <main>
           <Hero onGetStartedClick={() => (isAuthenticated ? setView("dashboard") : handleOpenAuth("signup"))} />
@@ -1744,7 +1771,7 @@ function LandingPageContent({
         </main>
       )}
 
-      <Footer />
+      {view !== "dashboard" && <Footer />}
     </div>
   );
 }
@@ -1753,14 +1780,92 @@ function LandingPageContent({
 // ─── Root Application ────────────────────────────────────────────────────────
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
-  const [view, setView] = useState<"landing" | "dashboard">("landing");
+  const [view, setViewState] = useState<"landing" | "dashboard">(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("view") === "dashboard" || p.get("dashboard") === "1" || window.location.hash.includes("dashboard")) {
+        return "dashboard";
+      }
+    }
+    return "landing";
+  });
+
+  const setView = (newView: "landing" | "dashboard", replace = false) => {
+    setViewState(newView);
+    if (typeof window !== "undefined" && window.history) {
+      const url = new URL(window.location.href);
+      if (newView === "dashboard") {
+        url.searchParams.set("view", "dashboard");
+      } else {
+        url.searchParams.delete("view");
+        url.searchParams.delete("dashboard");
+      }
+      const searchStr = url.searchParams.toString();
+      const newUrl = url.pathname + (searchStr ? `?${searchStr}` : "") + url.hash;
+      if (replace) {
+        window.history.replaceState({ view: newView }, "", newUrl);
+      } else {
+        window.history.pushState({ view: newView }, "", newUrl);
+      }
+    }
+  };
+
+  // Synchronize view state with browser back/forward buttons (popstate)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const isDashboard =
+        p.get("view") === "dashboard" ||
+        p.get("dashboard") === "1" ||
+        window.location.hash.includes("dashboard");
+      setViewState(isDashboard ? "dashboard" : "landing");
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<"login" | "signup" | "forgot">("login");
   const [pendingPlanId, setPendingPlanId] = useState<"starter" | "pro" | "lifetime" | null>(null);
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [demoNotice, setDemoNotice] = useState<string | null>(null);
 
-  const { isAuthenticated, user, selectPlan } = useAuth();
+  const { isAuthenticated, loading, user, selectPlan } = useAuth();
+
+  // Auto-route to Dashboard when ?view=dashboard or ?pricing=1 is present
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleHashAndParams = () => {
+      const p = new URLSearchParams(window.location.search);
+      const requestedView = p.get("view");
+      const hasDashboardParam = requestedView === "dashboard" || p.get("dashboard") === "1";
+      const isPricingTarget = window.location.hash === "#pricing" || p.get("pricing") === "1";
+
+      if (hasDashboardParam) {
+        setViewState("dashboard");
+      }
+
+      if (isPricingTarget) {
+        if (isAuthenticated) {
+          setViewState("dashboard");
+        }
+        setTimeout(() => {
+          const pricingEl = document.querySelector("#pricing");
+          if (pricingEl) {
+            pricingEl.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 250);
+      }
+    };
+
+    handleHashAndParams();
+    window.addEventListener("hashchange", handleHashAndParams);
+    return () => window.removeEventListener("hashchange", handleHashAndParams);
+  }, [isAuthenticated]);
 
   // Desktop App Authentication Flow (?desktop_auth=1)
   const [isDesktopAuthFlow, setIsDesktopAuthFlow] = useState(() => {
@@ -1796,7 +1901,9 @@ export default function App() {
       const newUrl = url.pathname + (remainingSearch ? `?${remainingSearch}` : "");
       window.history.replaceState({}, document.title, newUrl);
     }
-    setView("dashboard");
+    if (isAuthenticated) {
+      setView("dashboard");
+    }
   };
 
   const [desktopSessionId] = useState(() => {
@@ -1913,6 +2020,7 @@ export default function App() {
               view={view}
               checkoutStatus={checkoutStatus}
               isAuthenticated={isAuthenticated}
+              loading={loading}
               handleSelectPlan={handleSelectPlan}
               loadingPlanId={loadingPlanId}
               demoNotice={demoNotice}
@@ -1938,6 +2046,7 @@ export default function App() {
               view={view}
               checkoutStatus={checkoutStatus}
               isAuthenticated={isAuthenticated}
+              loading={loading}
               handleSelectPlan={handleSelectPlan}
               loadingPlanId={loadingPlanId}
               demoNotice={demoNotice}
@@ -1952,6 +2061,9 @@ export default function App() {
         onClose={() => {
           setAuthModalOpen(false);
           setPendingPlanId(null);
+          if (isDesktopAuthFlow && !isAuthenticated) {
+            closeDesktopAuthModal();
+          }
         }}
         initialTab={authModalTab}
         pendingPlanId={pendingPlanId}

@@ -24,9 +24,14 @@ build/
 # Large ZIP archives & temp files
 *.zip
 ChatGPT Image*.png
+*test api.txt
+razepay test api.txt
 
 # Embedded separate repositories
 interview helper/
+Dashbord/
+**/Dashbord/
+*Navbar Logo*.png
 
 # Logs
 *.log

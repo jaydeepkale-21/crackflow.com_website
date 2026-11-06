@@ -50,6 +50,9 @@ export function formatAuthError(error: any): string {
   if (code === "auth/popup-closed-by-user") {
     return "Sign in popup was closed before completing Google authentication.";
   }
+  if (code === "auth/popup-blocked") {
+    return "Sign in pop-up was blocked by your browser. Please allow pop-ups for this site, or sign in using your email and password.";
+  }
   if (code === "auth/invalid-email") {
     return "Please enter a valid email address.";
   }
