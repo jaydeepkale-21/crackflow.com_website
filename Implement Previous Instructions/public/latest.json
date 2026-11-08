@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "notes": "CrackFlow Desktop Release with Single-Instance Launch Protection and Stealth Mode.",
+  "pub_date": "2026-11-08T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://crackflow.com_website.pages.dev/downloads/CrackFlow-Setup.exe"
+    }
+  }
+}
