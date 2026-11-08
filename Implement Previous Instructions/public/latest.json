@@ -1,10 +1,10 @@
 {
-  "version": "0.2.0",
-  "notes": "CrackFlow v0.2.0 Test Release: Single-instance window management, real-time background protection, and new toolbar branding.",
-  "pub_date": "2026-11-08T00:00:00Z",
+  "version": "2.4.2",
+  "notes": "CrackFlow v2.4.2 Production Release: Official single-instance application behaviour, verified auto-updater, invisible screen-capture toolbar, and updated branding.",
+  "pub_date": "2026-11-08T03:36:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTZ1NMRXJHZ3NJUTdTdlFTa3pHd2NGbUJSNVNTNVA2ODBObFZPeVpHbUc3TFZTQ29tY1QrTDAyRkpzR3dSNEU5OFF5ZmlUS0VhTkVCYy9NcUwyNnduVDlXZEtsY3lYelEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTA3MTczCWZpbGU6Q3JhY2tGbG93LVNldHVwLmV4ZQpCamZ6dlRQSys0V25BK2pkQWxTQmwvcGk5MzI3MjgvcGxqK0FVS2hsVWdoZ0hwaXBMTzNSb0ZHSWw1NVgralZjWWJ3bHYrcVdvb2R3MjdxbEhzL21DUT09Cg==",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTZ1NMRXJHZ3NJUXluQ3BsRHo3UWtqeE5hY2w2WWNpTWJmR2sxUC9aOVZFQzJXd2NjWHlMK3hHTFFueVNER3dBYjFaY2tzQTg2SklQa2xkc0tCY1dkUXRkc3V4S2ZJS1FZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTA5MDAzCWZpbGU6Q3JhY2tGbG93LVNldHVwLmV4ZQo0dk9LeDk4WE5SeDM1QTRZQ08yakNPU2ZBS2dsQnNkcXBneGtnR092YTk0NFAwbk43RmxHb3Ztc3gzN1prSXhwMlRvNGlJRWZHSERrQkw0cEthQXFBUT09Cg==",
       "url": "https://raw.githubusercontent.com/jaydeepkale-21/crackflow.com_website/main/Implement%20Previous%20Instructions/public/downloads/CrackFlow-Setup.exe"
     }
   }

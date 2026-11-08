@@ -243,8 +243,8 @@ export async function getLatestVersion(): Promise<ApiResponse<VersionResponse>> 
   return {
     success: true,
     data: {
-      version: "v2.4.1",
-      releaseDate: "2026-03-01",
+      version: "v2.4.2",
+      releaseDate: "2026-11-08",
       notes: "CrackFlow Desktop Production Release",
     },
   };

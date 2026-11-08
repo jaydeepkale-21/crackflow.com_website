@@ -147,7 +147,7 @@ export const GettingStartedPage: React.FC<GettingStartedPageProps> = ({
           </div>
           <div>
             <span>Version</span>
-            <strong>{downloadData?.version || "v2.4.1"}</strong>
+            <strong>{downloadData?.version || "v2.4.2"}</strong>
           </div>
           <div>
             <span>Installer size</span>
